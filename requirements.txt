@@ -1,0 +1,8 @@
+streamlit
+networkx
+qrcode
+Pillow
+streamlit-agraph
+streamlit-qrcode-scanner
+numpy
+opencv-python
