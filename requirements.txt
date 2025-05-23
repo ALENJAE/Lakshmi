@@ -6,4 +6,5 @@ streamlit-agraph
 streamlit-qrcode-scanner
 numpy
 opencv-python-headless
+pydot
 
