@@ -7,13 +7,6 @@
         "instruction": "go  5 feet straight",
         "images": [],
         "landmark": "towards right side you see achievements board"
-      },
-      "path_2": {
-        "label": "2",
-        "distance": 3,
-        "instruction": "go 3 feet straight",
-        "images": [],
-        "landmark": "you will see cad lab towards left side"
       }
     },
     "B": {
