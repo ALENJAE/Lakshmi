@@ -19,5 +19,11 @@
       }
     }
   },
-  "connections": {}
+  "connections": {
+    "B::path_1::A": {
+      "from": "B",
+      "to": "A",
+      "path_key": "path_1"
+    }
+  }
 }
