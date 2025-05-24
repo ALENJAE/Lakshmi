@@ -27,11 +27,6 @@
     }
   },
   "connections": {
-    "A::path_1::B": {
-      "from": "A",
-      "to": "B",
-      "path_key": "path_1"
-    },
     "B::path_1::A": {
       "from": "B",
       "to": "A",
