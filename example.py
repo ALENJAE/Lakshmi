@@ -760,4 +760,51 @@ def main():
             if st.session_state.selected_node:
                 source = st.session_state.selected_node
                 st.info(f"📍 Source: {source}")
-                destination_options = [n for n in node_keys if n != source
+                destination_options = [n for n in node_keys if n != source]
+                if not destination_options:
+                    st.warning("No other nodes available as destination.")
+                    return
+                destination = st.selectbox("🎯 Step 2: Select Destination Node", destination_options)
+                
+                if st.button("🗺️ Get Directions", type="primary"):
+                    with st.spinner("🔍 Finding optimal path..."):
+                        path, total_distance, G = find_path_with_weight(source, destination)
+                        if path:
+                            st.success(f"✅ Path found! Total distance: {total_distance:.1f} feet")
+                            show_path_graph_with_weights(path, total_distance)
+                            st.markdown("---")
+                            st.subheader("📋 Step-by-Step Navigation")
+                            display_navigation(path)
+                        else:
+                            st.error("❌ No path found between selected nodes")
+            else:
+                st.info("👆 Please scan a QR code to set the source node.")
+
+        else:  # Manual Selection Mode
+            st.subheader("🎯 Manual Navigation")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                source = st.selectbox("📍 Select Source Node", node_keys, key="manual_source")
+            
+            with col2:
+                destination_options = [n for n in node_keys if n != source]
+                destination = st.selectbox("🎯 Select Destination Node", destination_options, key="manual_destination")
+            
+            if st.button("🗺️ Get Directions", key="manual_directions", type="primary"):
+                with st.spinner("🔍 Finding optimal path..."):
+                    path, total_distance, G = find_path_with_weight(source, destination)
+                    if path:
+                        st.success(f"✅ Path found! Total distance: {total_distance:.1f} feet")
+                        show_path_graph_with_weights(path, total_distance)
+                        st.markdown("---")
+                        st.subheader("📋 Step-by-Step Navigation")
+                        display_navigation(path)
+                    else:
+                        st.error("❌ No path found between selected nodes")
+        
+        st.markdown("---")
+        show_interactive_graph()
+
+if __name__ == "__main__":
+    main()
