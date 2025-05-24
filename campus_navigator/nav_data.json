@@ -15,6 +15,15 @@
         "images": [],
         "landmark": "you will see cad lab towards left side"
       }
+    },
+    "B": {
+      "path_1": {
+        "label": "1B",
+        "distance": 3,
+        "instruction": "go 3 feet straight",
+        "images": [],
+        "landmark": ""
+      }
     }
   },
   "connections": {}
