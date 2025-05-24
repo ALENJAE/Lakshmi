@@ -1,14 +1,5 @@
 {
   "nodes": {
-    "A": {
-      "path_1": {
-        "label": "1",
-        "distance": 5,
-        "instruction": "go  5 feet straight",
-        "images": [],
-        "landmark": "towards right side you see achievements board"
-      }
-    },
     "B": {
       "path_1": {
         "label": "1B",
