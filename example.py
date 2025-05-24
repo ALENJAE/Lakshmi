@@ -515,48 +515,109 @@ def find_path(start, end):
     path, _, _ = find_path_with_weight(start, end)
     return path
 
-# Visualization Functions (same as before)
+# Improved Visualization Functions with better sizing and responsiveness
 def show_path_graph_with_weights(path, total_distance):
     st.subheader(f"Navigation Path (Total Distance: {total_distance:.1f} ft)")
     
-    nodes = []
-    for node_name in st.session_state.nav_data['nodes']:
-        if node_name in path:
-            if node_name == path[0]:
-                nodes.append(Node(id=node_name, label=f"{node_name}\n(START)", color="#4CAF50", size=25))
-            elif node_name == path[-1]:
-                nodes.append(Node(id=node_name, label=f"{node_name}\n(END)", color="#F44336", size=25))
-            else:
-                nodes.append(Node(id=node_name, label=node_name, color="#FF9800", size=20))
-        else:
-            nodes.append(Node(id=node_name, label=node_name, color="#9E9E9E", size=15))
-    
-    edges = []
-    path_edges = set()
-    
-    for i in range(len(path)-1):
-        path_edges.add((path[i], path[i+1]))
-    
-    for conn, details in st.session_state.nav_data['connections'].items():
-        source = details['from']
-        target = details['to']
-        path_key = details['path_key']
-        distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
+    # Create a container with custom styling for better visibility
+    with st.container():
+        st.markdown("""
+        <style>
+        .main .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+        </style>
+        """, unsafe_allow_html=True)
         
-        if (source, target) in path_edges:
-            edges.append(Edge(source=source, target=target, 
-                            label=f"{distance} ft", color="#2196F3", width=5))
+        nodes = []
+        for node_name in st.session_state.nav_data['nodes']:
+            if node_name in path:
+                if node_name == path[0]:
+                    nodes.append(Node(id=node_name, label=f"{node_name}\n(START)", 
+                                    color="#4CAF50", size=30, font={"size": 16, "color": "#fff"}))
+                elif node_name == path[-1]:
+                    nodes.append(Node(id=node_name, label=f"{node_name}\n(END)", 
+                                    color="#F44336", size=30, font={"size": 16, "color": "#fff"}))
+                else:
+                    nodes.append(Node(id=node_name, label=node_name, 
+                                    color="#FF9800", size=25, font={"size": 14, "color": "#fff"}))
+            else:
+                nodes.append(Node(id=node_name, label=node_name, 
+                                color="#9E9E9E", size=20, font={"size": 12, "color": "#333"}))
+        
+        edges = []
+        path_edges = set()
+        
+        for i in range(len(path)-1):
+            path_edges.add((path[i], path[i+1]))
+        
+        for conn, details in st.session_state.nav_data['connections'].items():
+            source = details['from']
+            target = details['to']
+            path_key = details['path_key']
+            distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
+            
+            if (source, target) in path_edges:
+                edges.append(Edge(source=source, target=target, 
+                                label=f"{distance} ft", color="#2196F3", width=6,
+                                font={"size": 14, "strokeWidth": 2, "strokeColor": "#fff"}))
+            else:
+                edges.append(Edge(source=source, target=target, 
+                                label=f"{distance} ft", color="#BDBDBD", width=2,
+                                font={"size": 10}))
+        
+        # Improved configuration with better physics and sizing
+        config = Config(
+            height=700,  # Increased height
+            width="100%",  # Full width
+            directed=True,
+            physics={
+                'enabled': True,
+                'stabilization': {
+                    'enabled': True,
+                    'iterations': 200,
+                    'fit': True
+                },
+                'barnesHut': {
+                    'gravitationalConstant': -8000,
+                    'centralGravity': 0.3,
+                    'springLength': 95,
+                    'springConstant': 0.04,
+                    'damping': 0.09,
+                    'avoidOverlap': 0.1
+                },
+                'solver': 'barnesHut'
+            },
+            layout={
+                'hierarchical': {
+                    'enabled': False
+                }
+            },
+            interaction={
+                'dragNodes': True,
+                'dragView': True,
+                'zoomView': True,
+                'selectConnectedEdges': True,
+                'hover': True
+            },
+            configure={
+                'enabled': False
+            },
+            edges={
+                'smooth': {
+                    'enabled': True,
+                    'type': 'dynamic'
+                }
+            }
+        )
+        
+        if nodes:
+            # Add instructions for better user experience
+            st.info("💡 **Navigation Tips:** Use mouse wheel to zoom, click and drag to pan the view. The blue highlighted path shows your route.")
+            agraph(nodes=nodes, edges=edges, config=config)
         else:
-            edges.append(Edge(source=source, target=target, 
-                            label=f"{distance} ft", color="#757575", width=2))
-    
-    config = Config(height=600, width=800, directed=True, 
-                   physics={'enabled': True, 'stabilization': {'iterations': 100}})
-    
-    if nodes:
-        agraph(nodes=nodes, edges=edges, config=config)
-    else:
-        st.info("No nodes to display.")
+            st.info("No nodes to display.")
 
 def show_graph():
     st.subheader("Node Network Graph (Simple)")
@@ -575,19 +636,49 @@ def show_graph():
 
 def show_interactive_graph():
     st.subheader("Interactive Node Graph with Distances")
-    nodes = [Node(id=n, label=n) for n in st.session_state.nav_data['nodes']]
-    edges = []
-    for conn, details in st.session_state.nav_data['connections'].items():
-        source = details['from']
-        target = details['to']
-        path_key = details['path_key']
-        distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
-        edges.append(Edge(source=source, target=target, label=f"{distance} ft"))
-    config = Config(height=500, width=700, directed=True)
-    if nodes:
-        agraph(nodes=nodes, edges=edges, config=config)
-    else:
-        st.info("No nodes to display.")
+    
+    # Create container for better layout
+    with st.container():
+        nodes = []
+        for n in st.session_state.nav_data['nodes']:
+            nodes.append(Node(id=n, label=n, size=20, font={"size": 14}))
+        
+        edges = []
+        for conn, details in st.session_state.nav_data['connections'].items():
+            source = details['from']
+            target = details['to']
+            path_key = details['path_key']
+            distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
+            edges.append(Edge(source=source, target=target, 
+                            label=f"{distance} ft", font={"size": 12}))
+        
+        config = Config(
+            height=600, 
+            width="100%",  # Full width
+            directed=True,
+            physics={
+                'enabled': True,
+                'stabilization': {'iterations': 150, 'fit': True},
+                'barnesHut': {
+                    'gravitationalConstant': -2000,
+                    'centralGravity': 0.1,
+                    'springLength': 100,
+                    'springConstant': 0.05,
+                    'damping': 0.09
+                }
+            },
+            interaction={
+                'dragNodes': True,
+                'dragView': True,
+                'zoomView': True
+            }
+        )
+        
+        if nodes:
+            st.info("💡 **Graph Controls:** Drag nodes to rearrange, use mouse wheel to zoom, click and drag empty space to pan.")
+            agraph(nodes=nodes, edges=edges, config=config)
+        else:
+            st.info("No nodes to display.")
 
 # QR Scanner
 def qr_scanner():
@@ -604,17 +695,25 @@ def qr_scanner():
 
 # Main Application
 def main():
+    # Set page config for better layout
+    st.set_page_config(
+        page_title="Smart Campus Navigator",
+        page_icon="🗺️",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
     # Check GitHub configuration
     if not GITHUB_TOKEN or not GITHUB_REPO:
         st.error("GitHub configuration missing. Please set GITHUB_TOKEN and GITHUB_REPO in Streamlit secrets.")
         st.info("Required secrets: GITHUB_TOKEN, GITHUB_REPO")
         return
     
-    st.sidebar.title("Smart Campus Navigator")
+    st.sidebar.title("🗺️ Smart Campus Navigator")
     mode = st.sidebar.radio("Mode", ["User", "Admin"])
     
     if mode == "Admin":
-        st.title("System Administration")
+        st.title("🔧 System Administration")
         
         admin_action = st.selectbox(
             "Select Action",
@@ -638,7 +737,7 @@ def main():
         show_interactive_graph()
 
     else:
-        st.title("Campus Navigation")
+        st.title("🧭 Campus Navigation")
         node_keys = list(st.session_state.nav_data['nodes'].keys())
         
         if not node_keys:
@@ -648,64 +747,17 @@ def main():
         user_mode = st.radio("Navigation Mode", ["QR Scanner Mode", "Manual Selection Mode"])
         
         if user_mode == "QR Scanner Mode":
-            st.subheader("Step 1: Scan QR Code for Source Node")
+            st.subheader("📱 Step 1: Scan QR Code for Source Node")
             qr_code = qrcode_scanner()
 
             if qr_code:
                 if qr_code in node_keys:
                     st.session_state.selected_node = qr_code
-                    st.success(f"Source node detected: {qr_code}")
+                    st.success(f"✅ Source node detected: {qr_code}")
                 else:
-                    st.error("Scanned QR does not match any node.")
+                    st.error("❌ Scanned QR does not match any node.")
 
             if st.session_state.selected_node:
                 source = st.session_state.selected_node
-                st.info(f"Source: {source}")
-                destination_options = [n for n in node_keys if n != source]
-                if not destination_options:
-                    st.warning("No other nodes available as destination.")
-                    return
-                destination = st.selectbox("Step 2: Select Destination Node", destination_options)
-                
-                if st.button("Get Directions"):
-                    with st.spinner("Finding optimal path..."):
-                        path, total_distance, G = find_path_with_weight(source, destination)
-                        if path:
-                            st.success(f"Path found! Total distance: {total_distance:.1f} feet")
-                            show_path_graph_with_weights(path, total_distance)
-                            st.markdown("---")
-                            st.subheader("Step-by-Step Navigation")
-                            display_navigation(path)
-                        else:
-                            st.error("No path found")
-            else:
-                st.info("Please scan a QR code to set the source node.")
-
-        else:  # Manual Selection Mode
-            st.subheader("Manual Navigation")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                source = st.selectbox("Select Source Node", node_keys, key="manual_source")
-            
-            with col2:
-                destination_options = [n for n in node_keys if n != source]
-                destination = st.selectbox("Select Destination Node", destination_options, key="manual_destination")
-            
-            if st.button("Get Directions", key="manual_directions"):
-                with st.spinner("Finding optimal path..."):
-                    path, total_distance, G = find_path_with_weight(source, destination)
-                    if path:
-                        st.success(f"Path found! Total distance: {total_distance:.1f} feet")
-                        show_path_graph_with_weights(path, total_distance)
-                        st.markdown("---")
-                        st.subheader("Step-by-Step Navigation")
-                        display_navigation(path)
-                    else:
-                        st.error("No path found")
-        
-        st.markdown("---")
-        show_interactive_graph()
-
-if __name__ == "__main__":
-    main()
+                st.info(f"📍 Source: {source}")
+                destination_options = [n for n in node_keys if n != source
