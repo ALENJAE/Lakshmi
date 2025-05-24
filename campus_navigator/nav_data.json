@@ -24,6 +24,11 @@
       "from": "B",
       "to": "A",
       "path_key": "path_1"
+    },
+    "A::path_1::B": {
+      "from": "A",
+      "to": "B",
+      "path_key": "path_1"
     }
   }
 }
