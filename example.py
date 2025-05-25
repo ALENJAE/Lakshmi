@@ -822,53 +822,98 @@ def show_full_graph():
     )
     
     if nodes:
-        # Apply custom CSS for checkered background and prevent node interactions
-        st.markdown("""
-        <style>
-        .agraph-container {
-            background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
-                        linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
-                        linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
-                        linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
-            background-size: 20px 20px;
-            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
-            background-color: #ffffff;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-        }
+        # Create base64 encoded checkered pattern image
+        import base64
+        from io import BytesIO
+        try:
+            from PIL import Image, ImageDraw
+            
+            # Create checkered pattern image
+            img_size = 60
+            img = Image.new('RGB', (img_size, img_size), color='#ffffff')
+            draw = ImageDraw.Draw(img)
+            
+            # Draw checkered pattern
+            square_size = 15
+            for x in range(0, img_size, square_size):
+                for y in range(0, img_size, square_size):
+                    if (x // square_size + y // square_size) % 2 == 0:
+                        draw.rectangle([x, y, x + square_size, y + square_size], fill='#f5f5f5')
+            
+            # Convert to base64
+            buffer = BytesIO()
+            img.save(buffer, format='PNG')
+            img_str = base64.b64encode(buffer.getvalue()).decode()
+            
+            checkered_bg = f"data:image/png;base64,{img_str}"
+            
+        except ImportError:
+            # Fallback to CSS pattern if PIL not available
+            checkered_bg = None
         
-        /* Ensure nodes maintain fixed size during zoom and cannot be dragged */
-        .agraph-container svg g.nodes circle {
-            r: 20px !important;
-            pointer-events: none !important;  /* Disable mouse interactions */
-        }
-        
-        .agraph-container svg g.nodes text {
-            pointer-events: none !important;  /* Disable text interactions */
-        }
-        
-        /* Light checkered pattern background for better visibility */
-        .agraph-container svg {
-            background: linear-gradient(45deg, #f8f9fa 25%, transparent 25%), 
-                        linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), 
-                        linear-gradient(45deg, transparent 75%, #f8f9fa 75%), 
-                        linear-gradient(-45deg, transparent 75%, #f8f9fa 75%);
+        # Apply custom CSS with image background and prevent node interactions
+        css_background = f"background-image: url('{checkered_bg}');" if checkered_bg else """
+            background: linear-gradient(45deg, #f5f5f5 25%, transparent 25%), 
+                        linear-gradient(-45deg, #f5f5f5 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #f5f5f5 75%), 
+                        linear-gradient(-45deg, transparent 75%, #f5f5f5 75%);
             background-size: 30px 30px;
             background-position: 0 0, 0 15px, 15px -15px, -15px 0px;
-            background-color: #ffffff !important;
-        }
+        """
+        
+        st.markdown(f"""
+        <style>
+        .agraph-container {{
+            {css_background}
+            background-color: #e8e8e8;
+            border: 2px solid #cccccc;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 10px;
+        }}
+        
+        /* Ensure nodes maintain fixed size during zoom and cannot be dragged */
+        .agraph-container svg g.nodes circle {{
+            r: 20px !important;
+            pointer-events: none !important;  /* Disable mouse interactions */
+        }}
+        
+        .agraph-container svg g.nodes text {{
+            pointer-events: none !important;  /* Disable text interactions */
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(255,255,255,0.8);
+        }}
+        
+        /* Light gray checkered pattern background */
+        .agraph-container svg {{
+            {css_background}
+            background-color: #e8e8e8 !important;
+            border-radius: 8px;
+        }}
+        
+        /* Style edges with better visibility */
+        .agraph-container svg g.edges path {{
+            stroke-width: 3px !important;
+            filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.2));
+        }}
         
         /* Disable node dragging completely */
-        .agraph-container .drag {
+        .agraph-container .drag {{
             pointer-events: none !important;
-        }
+        }}
+        
+        /* Enhanced map-like appearance */
+        .agraph-container svg g.nodes circle {{
+            stroke: #ffffff !important;
+            stroke-width: 3px !important;
+            filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+        }}
         </style>
         """, unsafe_allow_html=True)
         
         agraph(nodes=nodes, edges=edges, config=config)
     else:
         st.info("No nodes available. Create some nodes first!")
-
 # QR Code Scanner Integration
 def handle_qr_scanner():
     st.subheader("📱 QR Code Scanner")
