@@ -7,6 +7,7 @@ import qrcode
 from PIL import Image
 import io
 import tempfile
+import time
 
 from streamlit_agraph import agraph, Node, Edge, Config
 from streamlit_qrcode_scanner import qrcode_scanner
@@ -20,6 +21,7 @@ HEADERS = {"Authorization": f"token {GITHUB_TOKEN}"}
 
 # Helper functions for GitHub API
 def get_github_files(path):
+    """Get list of files in a GitHub directory"""
     url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{path}"
     response = requests.get(url, headers=HEADERS)
     return response.json() if response.status_code == 200 else []
@@ -141,30 +143,78 @@ def delete_folder_contents(folder_path):
         st.error(f"Error deleting folder contents: {str(e)}")
         return False
 
+def initialize_github_structure():
+    """Initialize the required folder structure on GitHub"""
+    try:
+        # Check if base structure exists
+        base_files = get_github_files(BASE_PATH)
+        
+        # Create nav_data.json if it doesn't exist
+        nav_data_exists = any(f['name'] == 'nav_data.json' for f in base_files if f['type'] == 'file')
+        if not nav_data_exists:
+            initial_data = {"nodes": {}, "connections": {}}
+            create_file(f"{BASE_PATH}/nav_data.json", json.dumps(initial_data, indent=2), "Initialize navigation data")
+            st.info("Created initial nav_data.json")
+        
+        # Create placeholder files for directories (GitHub doesn't store empty directories)
+        images_path = f"{BASE_PATH}/images/.gitkeep"
+        qr_path = f"{BASE_PATH}/qrcodes/.gitkeep"
+        
+        # Check if directories exist by trying to access them
+        if not get_github_files(f"{BASE_PATH}/images"):
+            create_file(images_path, "# Placeholder for images directory", "Create images directory")
+            st.info("Created images directory")
+            
+        if not get_github_files(f"{BASE_PATH}/qrcodes"):
+            create_file(qr_path, "# Placeholder for QR codes directory", "Create QR codes directory")
+            st.info("Created QR codes directory")
+            
+        return True
+    except Exception as e:
+        st.error(f"Error initializing GitHub structure: {str(e)}")
+        return False
+
 # Data management functions
 def load_navigation_data():
     """Load navigation data from GitHub"""
-    data_path = f"{BASE_PATH}/nav_data.json"
-    content = get_file_content(data_path)
-    if content:
-        try:
-            return json.loads(content)
-        except json.JSONDecodeError:
-            st.error("Error parsing navigation data")
-            return {"nodes": {}, "connections": {}}
-    return {"nodes": {}, "connections": {}}
+    try:
+        data_path = f"{BASE_PATH}/nav_data.json"
+        content = get_file_content(data_path)
+        if content:
+            try:
+                return json.loads(content)
+            except json.JSONDecodeError:
+                st.error("Error parsing navigation data")
+                return {"nodes": {}, "connections": {}}
+        else:
+            # Try to initialize structure if data doesn't exist
+            st.warning("Navigation data not found. Initializing...")
+            if initialize_github_structure():
+                return {"nodes": {}, "connections": {}}
+            else:
+                st.error("Failed to initialize GitHub structure")
+                return {"nodes": {}, "connections": {}}
+    except Exception as e:
+        st.error(f"Error loading navigation data: {str(e)}")
+        return {"nodes": {}, "connections": {}}
 
 def save_navigation_data(data):
     """Save navigation data to GitHub"""
-    data_path = f"{BASE_PATH}/nav_data.json"
-    content = json.dumps(data, indent=2)
-    return update_file(data_path, content, "Update navigation data")
+    try:
+        data_path = f"{BASE_PATH}/nav_data.json"
+        content = json.dumps(data, indent=2)
+        return update_file(data_path, content, "Update navigation data")
+    except Exception as e:
+        st.error(f"Error saving navigation data: {str(e)}")
+        return False
 
 def upload_image_to_github(uploaded_file, node_name, path_key):
     """Upload image to GitHub and return the path"""
     try:
         file_extension = uploaded_file.name.split('.')[-1]
-        image_path = f"{BASE_PATH}/images/{node_name}_{path_key}_{uploaded_file.name}"
+        # Sanitize filename
+        safe_filename = "".join(c for c in uploaded_file.name if c.isalnum() or c in '._-')
+        image_path = f"{BASE_PATH}/images/{node_name}_{path_key}_{safe_filename}"
         
         if create_file(image_path, uploaded_file.getvalue(), f"Upload image for {node_name}", is_binary=True):
             return image_path
@@ -203,11 +253,24 @@ def generate_and_save_qr(node_name):
         img_bytes.seek(0)
         
         qr_path = f"{BASE_PATH}/qrcodes/{node_name}.png"
-        if create_file(qr_path, img_bytes.getvalue(), f"Generate QR code for {node_name}", is_binary=True):
+        if create_file(qr_path, img_bytes.getvalue(), f"Generate QR code for {node_name}", is_binary=True) or \
+           update_file(qr_path, img_bytes.getvalue(), f"Update QR code for {node_name}", is_binary=True):
             return qr_path
         return None
     except Exception as e:
         st.error(f"Error generating QR code: {str(e)}")
+        return None
+
+def get_qr_code_from_github(node_name):
+    """Get QR code image from GitHub"""
+    try:
+        qr_path = f"{BASE_PATH}/qrcodes/{node_name}.png"
+        image_data = get_file_content(qr_path, is_binary=True)
+        if image_data:
+            return Image.open(io.BytesIO(image_data))
+        return None
+    except Exception as e:
+        st.error(f"Error loading QR code: {str(e)}")
         return None
 
 # Initialize session state
@@ -215,28 +278,66 @@ if 'nav_data' not in st.session_state:
     st.session_state.nav_data = load_navigation_data()
 if 'selected_node' not in st.session_state:
     st.session_state.selected_node = None
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = True
+
+# Refresh data function
+def refresh_data():
+    """Refresh navigation data from GitHub"""
+    with st.spinner("Refreshing data from GitHub..."):
+        st.session_state.nav_data = load_navigation_data()
+    st.success("Data refreshed successfully!")
+    st.rerun()
 
 # Image Upload Handler (GitHub version)
 def handle_image_upload_github(field_key, node_name, existing_images):
     uploaded_files = st.file_uploader(
         f"Upload images for {field_key}", 
         accept_multiple_files=True, 
-        key=f"img_{field_key}_{node_name}"
+        key=f"img_{field_key}_{node_name}",
+        type=['png', 'jpg', 'jpeg', 'gif']
     )
     img_paths = existing_images if existing_images else []
     
     if uploaded_files:
-        for uploaded_file in uploaded_files:
+        progress_bar = st.progress(0)
+        for idx, uploaded_file in enumerate(uploaded_files):
+            progress_bar.progress((idx + 1) / len(uploaded_files))
             with st.spinner(f"Uploading {uploaded_file.name}..."):
                 img_path = upload_image_to_github(uploaded_file, node_name, field_key)
                 if img_path and img_path not in img_paths:
                     img_paths.append(img_path)
-                    st.success(f"Uploaded {uploaded_file.name}")
+                    st.success(f"✅ Uploaded {uploaded_file.name}")
+                elif img_path in img_paths:
+                    st.info(f"ℹ️ {uploaded_file.name} already exists")
+                else:
+                    st.error(f"❌ Failed to upload {uploaded_file.name}")
+        progress_bar.empty()
+    
+    # Display existing images
+    if img_paths:
+        st.write("**Current Images:**")
+        cols = st.columns(min(len(img_paths), 3))
+        for idx, img_path in enumerate(img_paths):
+            with cols[idx % 3]:
+                img = get_image_from_github(img_path)
+                if img:
+                    st.image(img, caption=img_path.split('/')[-1], width=150)
+                else:
+                    st.error(f"Failed to load: {img_path.split('/')[-1]}")
+    
     return img_paths
 
-# Node Management (GitHub version)
+# Node Management (Enhanced GitHub version)
 def handle_node_creation():
     st.subheader("Node Editor")
+    
+    # Add refresh button
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        if st.button("🔄 Refresh Data"):
+            refresh_data()
+    
     existing_nodes = list(st.session_state.nav_data['nodes'].keys())
     selected_node = st.selectbox("Select Node", [""] + existing_nodes)
     
@@ -281,7 +382,7 @@ def handle_node_creation():
                 )
             }
     
-    if st.button("Save Node"):
+    if st.button("💾 Save Node"):
         if node_name:
             # Update node data
             if selected_node and selected_node != node_name and selected_node in st.session_state.nav_data['nodes']:
@@ -291,21 +392,37 @@ def handle_node_creation():
             
             # Generate QR code
             with st.spinner("Generating QR code..."):
-                generate_and_save_qr(node_name)
+                qr_path = generate_and_save_qr(node_name)
+                if qr_path:
+                    st.success("✅ QR code generated")
+                else:
+                    st.warning("⚠️ QR code generation failed")
             
             # Save to GitHub
             with st.spinner("Saving to GitHub..."):
                 if save_navigation_data(st.session_state.nav_data):
-                    st.success("Node saved successfully!")
+                    st.success("✅ Node saved successfully!")
+                    time.sleep(1)  # Small delay to ensure save completes
                     st.rerun()
                 else:
-                    st.error("Failed to save node data")
+                    st.error("❌ Failed to save node data")
         else:
             st.error("Please enter a node name")
+    
+    # Display QR code for existing node
+    if selected_node:
+        st.subheader(f"QR Code for {selected_node}")
+        qr_img = get_qr_code_from_github(selected_node)
+        if qr_img:
+            col1, col2, col3 = st.columns([1, 2, 1])
+            with col2:
+                st.image(qr_img, caption=f"QR Code for {selected_node}", width=200)
+        else:
+            st.warning("QR code not found. It will be generated when you save the node.")
 
-# Delete Functions (GitHub version)
+# Delete Functions (Enhanced GitHub version)
 def delete_node():
-    st.subheader("Delete Node")
+    st.subheader("🗑️ Delete Node")
     nodes = list(st.session_state.nav_data['nodes'].keys())
     if not nodes:
         st.warning("No nodes available to delete")
@@ -313,7 +430,24 @@ def delete_node():
     
     node_to_delete = st.selectbox("Select Node to Delete", nodes)
     
-    if st.button("Delete Node"):
+    # Show what will be deleted
+    if node_to_delete:
+        st.warning(f"This will delete:")
+        st.write(f"- Node: {node_to_delete}")
+        st.write(f"- QR Code: {node_to_delete}.png")
+        
+        node_data = st.session_state.nav_data['nodes'][node_to_delete]
+        image_count = sum(len(path_data.get('images', [])) for path_data in node_data.values())
+        st.write(f"- {image_count} associated images")
+        
+        # Count connections
+        connection_count = sum(1 for conn in st.session_state.nav_data['connections'] 
+                             if node_to_delete in conn.split("::"))
+        st.write(f"- {connection_count} connections")
+    
+    confirm = st.checkbox(f"I confirm I want to delete {node_to_delete} and all associated data")
+    
+    if st.button("🗑️ Delete Node") and confirm:
         with st.spinner("Deleting node and associated files..."):
             # Delete QR code
             qr_path = f"{BASE_PATH}/qrcodes/{node_to_delete}.png"
@@ -332,18 +466,19 @@ def delete_node():
             # Remove all connections involving this node
             connections = list(st.session_state.nav_data['connections'].items())
             for conn, details in connections:
-                if node_to_delete in conn.split("::")[0] or node_to_delete in conn.split("::")[-1]:
+                if node_to_delete in conn.split("::"):
                     del st.session_state.nav_data['connections'][conn]
             
             # Save updated data
             if save_navigation_data(st.session_state.nav_data):
-                st.success(f"Node {node_to_delete} and all associated files deleted!")
+                st.success(f"✅ Node {node_to_delete} and all associated files deleted!")
+                time.sleep(1)
                 st.rerun()
             else:
-                st.error("Failed to save updated data")
+                st.error("❌ Failed to save updated data")
 
 def delete_path():
-    st.subheader("Delete Path from Node")
+    st.subheader("🗑️ Delete Path from Node")
     nodes = list(st.session_state.nav_data['nodes'].keys())
     if not nodes:
         st.warning("No nodes available")
@@ -363,7 +498,19 @@ def delete_path():
                                options=[opt[0] for opt in path_options])
     path_to_delete = next(opt[1] for opt in path_options if opt[0] == selected_path)
     
-    if st.button("Delete Path"):
+    # Show what will be deleted
+    if path_to_delete:
+        path_data = st.session_state.nav_data['nodes'][node][path_to_delete]
+        st.warning(f"This will delete:")
+        st.write(f"- Path: {path_data['label']}")
+        st.write(f"- {len(path_data.get('images', []))} associated images")
+        
+        # Count connections using this path
+        connection_count = sum(1 for conn in st.session_state.nav_data['connections'] 
+                             if f"{node}::{path_to_delete}" in conn)
+        st.write(f"- {connection_count} connections")
+    
+    if st.button("🗑️ Delete Path"):
         with st.spinner("Deleting path and associated files..."):
             # Delete associated images
             path_data = st.session_state.nav_data['nodes'][node][path_to_delete]
@@ -382,13 +529,14 @@ def delete_path():
             
             # Save updated data
             if save_navigation_data(st.session_state.nav_data):
-                st.success(f"Path '{path_data['label']}' deleted from {node}!")
+                st.success(f"✅ Path '{path_data['label']}' deleted from {node}!")
+                time.sleep(1)
                 st.rerun()
             else:
-                st.error("Failed to save updated data")
+                st.error("❌ Failed to save updated data")
 
 def delete_link():
-    st.subheader("Delete Connection Between Nodes")
+    st.subheader("🗑️ Delete Connection Between Nodes")
     connections = list(st.session_state.nav_data['connections'].items())
     if not connections:
         st.warning("No connections available")
@@ -399,26 +547,30 @@ def delete_link():
         source = details['from']
         path_key = details['path_key']
         target = details['to']
-        path_label = st.session_state.nav_data['nodes'][source][path_key]['label']
-        connection_list.append(f"{source} ({path_label}) ➔ {target}")
+        if path_key in st.session_state.nav_data['nodes'][source]:
+            path_label = st.session_state.nav_data['nodes'][source][path_key]['label']
+            connection_list.append(f"{source} ({path_label}) ➔ {target}")
+        else:
+            connection_list.append(f"{source} (deleted path) ➔ {target}")
     
     selected_conn = st.selectbox("Select Connection to Delete", connection_list)
     conn_index = connection_list.index(selected_conn)
     conn_key = list(st.session_state.nav_data['connections'].keys())[conn_index]
     
-    if st.button("Delete Connection"):
+    if st.button("🗑️ Delete Connection"):
         with st.spinner("Deleting connection..."):
             del st.session_state.nav_data['connections'][conn_key]
             
             if save_navigation_data(st.session_state.nav_data):
-                st.success(f"Connection '{selected_conn}' deleted successfully!")
+                st.success(f"✅ Connection '{selected_conn}' deleted successfully!")
+                time.sleep(1)
                 st.rerun()
             else:
-                st.error("Failed to save updated data")
+                st.error("❌ Failed to save updated data")
 
-# Node Linking (GitHub version)
+# Node Linking (Enhanced GitHub version)
 def handle_node_linking():
-    st.subheader("Link Nodes")
+    st.subheader("🔗 Link Nodes")
     nodes = list(st.session_state.nav_data['nodes'].keys())
     if len(nodes) < 2:
         st.info("At least two nodes are needed to create a link.")
@@ -426,6 +578,11 @@ def handle_node_linking():
     
     source = st.selectbox("Source Node", nodes, key="link_source")
     source_paths = st.session_state.nav_data['nodes'][source]
+    
+    if not source_paths:
+        st.warning(f"No paths available in {source}")
+        return
+        
     path_options = [(f"{idx+1}. {path_data['label']}", path_key) 
                     for idx, (path_key, path_data) in enumerate(source_paths.items())]
     
@@ -435,9 +592,15 @@ def handle_node_linking():
     
     target = st.selectbox("Target Node", [n for n in nodes if n != source], key="link_target")
     
-    if st.button("Create Link"):
+    # Check if link already exists
+    conn_key = f"{source}::{path_key}::{target}"
+    link_exists = conn_key in st.session_state.nav_data['connections']
+    
+    if link_exists:
+        st.warning("⚠️ This link already exists!")
+    
+    if st.button("🔗 Create Link", disabled=link_exists):
         with st.spinner("Creating link..."):
-            conn_key = f"{source}::{path_key}::{target}"
             st.session_state.nav_data['connections'][conn_key] = {
                 "from": source,
                 "to": target,
@@ -445,13 +608,17 @@ def handle_node_linking():
             }
             
             if save_navigation_data(st.session_state.nav_data):
-                st.success(f"Link created from {source} ({source_paths[path_key]['label']}) to {target}")
+                st.success(f"✅ Link created from {source} ({source_paths[path_key]['label']}) to {target}")
+                time.sleep(1)
                 st.rerun()
             else:
-                st.error("Failed to save link data")
+                st.error("❌ Failed to save link data")
 
-# Navigation Display (GitHub version)
+# Navigation Display (Enhanced GitHub version)
 def display_navigation(path):
+    total_steps = len(path) - 1
+    st.info(f"Total Steps: {total_steps}")
+    
     for i in range(len(path)-1):
         current = path[i]
         next_node = path[i+1]
@@ -467,31 +634,43 @@ def display_navigation(path):
         
         if connection and path_key:
             node_data = st.session_state.nav_data['nodes'][current][path_key]
-            col1, col2 = st.columns([1, 2])
             
-            with col1:
-                st.subheader(f"Step {i+1}")
-                if node_data.get('images'):
-                    with st.spinner("Loading image..."):
-                        img = get_image_from_github(node_data['images'][0])
-                        if img:
-                            st.image(img, caption=node_data['label'])
-                        else:
-                            st.warning("Failed to load image")
-                else:
-                    st.warning("No image available")
-            
-            with col2:
-                st.markdown(f"""
-                **From:** {current}  
-                **To:** {next_node}  
-                **Instruction:** {node_data['instruction']}  
-                **Distance:** {node_data['distance']} ft  
-                **Landmark:** {node_data['landmark']}  
-                """)
-            st.markdown("---")
+            with st.container():
+                st.markdown(f"### 📍 Step {i+1} of {total_steps}")
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    if node_data.get('images'):
+                        with st.spinner("Loading image..."):
+                            img = get_image_from_github(node_data['images'][0])
+                            if img:
+                                st.image(img, caption=node_data['label'], use_column_width=True)
+                            else:
+                                st.warning("Failed to load image")
+                        
+                        # Show additional images if available
+                        if len(node_data['images']) > 1:
+                            with st.expander(f"View all {len(node_data['images'])} images"):
+                                for img_path in node_data['images']:
+                                    img = get_image_from_github(img_path)
+                                    if img:
+                                        st.image(img, caption=img_path.split('/')[-1])
+                    else:
+                        st.info("No image available for this step")
+                
+                with col2:
+                    st.markdown(f"""
+                    **From:** 📍 {current}  
+                    **To:** 📍 {next_node}  
+                    **Direction:** {node_data['label']}  
+                    **Distance:** 📏 {node_data['distance']} ft  
+                    **Instruction:** 📝 {node_data['instruction']}  
+                    **Landmark:** 🏛️ {node_data['landmark']}  
+                    """)
+                
+                st.markdown("---")
 
-# Path Finding Functions (same as before)
+# Path Finding Functions
 def find_path_with_weight(start, end):
     G = nx.DiGraph()
     for node in st.session_state.nav_data['nodes']:
@@ -501,8 +680,9 @@ def find_path_with_weight(start, end):
         source = details['from']
         target = details['to']
         path_key = details['path_key']
-        distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
-        G.add_edge(source, target, weight=distance, path_key=path_key)
+        if path_key in st.session_state.nav_data['nodes'][source]:
+            distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
+            G.add_edge(source, target, weight=distance, path_key=path_key)
     
     try:
         path = nx.shortest_path(G, start, end, weight='weight')
@@ -515,197 +695,603 @@ def find_path(start, end):
     path, _, _ = find_path_with_weight(start, end)
     return path
 
-# Visualization Functions (same as before)
 def show_path_graph_with_weights(path, total_distance):
-    st.subheader(f"Navigation Path (Total Distance: {total_distance:.1f} ft)")
+    st.subheader(f"🗺️ Navigation Path (Total Distance: {total_distance:.1f} ft)")
     
     nodes = []
     for node_name in st.session_state.nav_data['nodes']:
         if node_name in path:
             if node_name == path[0]:
-                nodes.append(Node(id=node_name, label=f"{node_name}\n(START)", color="#4CAF50", size=25))
+                nodes.append(Node(id=node_name, label=f"{node_name}\n🚀 START", color="#4CAF50", size=25))
             elif node_name == path[-1]:
-                nodes.append(Node(id=node_name, label=f"{node_name}\n(END)", color="#F44336", size=25))
+                nodes.append(Node(id=node_name, label=f"{node_name}\n🏁 END", color="#F44336", size=25))
             else:
                 nodes.append(Node(id=node_name, label=node_name, color="#FF9800", size=20))
         else:
             nodes.append(Node(id=node_name, label=node_name, color="#9E9E9E", size=15))
-    
+
     edges = []
-    path_edges = set()
-    
     for i in range(len(path)-1):
-        path_edges.add((path[i], path[i+1]))
-    
-    for conn, details in st.session_state.nav_data['connections'].items():
-        source = details['from']
-        target = details['to']
-        path_key = details['path_key']
-        distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
+        current = path[i]
+        next_node = path[i+1]
         
-        if (source, target) in path_edges:
-            edges.append(Edge(source=source, target=target, 
-                            label=f"{distance} ft", color="#2196F3", width=5))
-        else:
-            edges.append(Edge(source=source, target=target, 
-                            label=f"{distance} ft", color="#757575", width=2))
+        # Find the connection details
+        connection_details = None
+        for conn, details in st.session_state.nav_data['connections'].items():
+            source, path_key, target = conn.split("::")
+            if source == current and target == next_node:
+                connection_details = details
+                break
+        
+        if connection_details:
+            path_key = connection_details['path_key']
+            if path_key in st.session_state.nav_data['nodes'][current]:
+                distance = st.session_state.nav_data['nodes'][current][path_key]['distance']
+                label = st.session_state.nav_data['nodes'][current][path_key]['label']
+                edges.append(Edge(
+                    source=current,
+                    target=next_node,
+                    label=f"{label}\n{distance}ft",
+                    color="#2196F3",
+                    width=3
+                ))
+
+    config = Config(
+        width=800,
+        height=600,
+        directed=True,
+        physics=True,
+        hierarchical=False,
+        nodeHighlightBehavior=True,
+        highlightColor="#F0F8FF",
+        maxZoom=2,
+        minZoom=0.1
+    )
     
-    config = Config(height=600, width=800, directed=True, 
-                   physics={'enabled': True, 'stabilization': {'iterations': 100}})
-    
-    if nodes:
+    if nodes and edges:
         agraph(nodes=nodes, edges=edges, config=config)
     else:
-        st.info("No nodes to display.")
+        st.warning("No path visualization available")
+def show_full_graph():
+    st.subheader("🗺️ Complete Campus Network")
+    
+    nodes = []
+    for node_name in st.session_state.nav_data['nodes']:
+        nodes.append(Node(id=node_name, label=node_name, color="#2196F3", size=20))
 
-def show_graph():
-    st.subheader("Node Network Graph (Simple)")
-    G = nx.DiGraph()
-    for node in st.session_state.nav_data['nodes']:
-        G.add_node(node)
-    for conn, details in st.session_state.nav_data['connections'].items():
-        source = details['from']
-        target = details['to']
-        G.add_edge(source, target)
-    if G.number_of_nodes() > 0:
-        dot_str = nx.nx_pydot.to_pydot(G).to_string()
-        st.graphviz_chart(dot_str)
-    else:
-        st.info("No nodes to display.")
-
-def show_interactive_graph():
-    st.subheader("Interactive Node Graph with Distances")
-    nodes = [Node(id=n, label=n) for n in st.session_state.nav_data['nodes']]
     edges = []
     for conn, details in st.session_state.nav_data['connections'].items():
         source = details['from']
         target = details['to']
         path_key = details['path_key']
-        distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
-        edges.append(Edge(source=source, target=target, label=f"{distance} ft"))
-    config = Config(height=500, width=700, directed=True)
+        
+        if path_key in st.session_state.nav_data['nodes'][source]:
+            distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
+            label = st.session_state.nav_data['nodes'][source][path_key]['label']
+            edges.append(Edge(source=source, target=target, 
+                            label=f"{label}\n{distance}ft", color="#4CAF50"))
+
+    config = Config(width=800, height=600, directed=True, physics=True, 
+                   hierarchical=False, nodeHighlightBehavior=True, 
+                   highlightColor="#F0F8FF", maxZoom=2, minZoom=0.1)
+    
     if nodes:
         agraph(nodes=nodes, edges=edges, config=config)
     else:
-        st.info("No nodes to display.")
+        st.info("No nodes available. Create some nodes first!")
 
-# QR Scanner
-def qr_scanner():
-    qr_code = qrcode_scanner(key='qrcode_scanner', box_size=800)
-    if qr_code:
-        node_name = qr_code
-        if node_name in st.session_state.nav_data['nodes']:
-            st.session_state.selected_node = node_name
-            st.success(f"Scanned Node: {node_name}")
-            return node_name
-        else:
-            st.error("Scanned node not found in database.")
-    return None
+# QR Code Scanner Integration
+def handle_qr_scanner():
+    st.subheader("📱 QR Code Scanner")
+    
+    scanner_tab1, scanner_tab2 = st.tabs(["📷 Live Scanner", "📁 Upload Image"])
+    
+    with scanner_tab1:
+        st.info("Use your device camera to scan QR codes")
+        qr_code = qrcode_scanner(key="qr_scanner")
+        
+        if qr_code:
+            st.success(f"✅ QR Code detected: {qr_code}")
+            if qr_code in st.session_state.nav_data['nodes']:
+                st.session_state.selected_node = qr_code
+                st.info(f"📍 Node '{qr_code}' selected for navigation")
+            else:
+                st.warning(f"⚠️ Node '{qr_code}' not found in the system")
+    
+    with scanner_tab2:
+        uploaded_qr = st.file_uploader("Upload QR Code Image", type=['png', 'jpg', 'jpeg'])
+        if uploaded_qr:
+            try:
+                from pyzbar import pyzbar
+                import cv2
+                import numpy as np
+                
+                # Convert uploaded file to opencv format
+                file_bytes = np.asarray(bytearray(uploaded_qr.read()), dtype=np.uint8)
+                img = cv2.imdecode(file_bytes, 1)
+                
+                # Decode QR codes
+                qr_codes = pyzbar.decode(img)
+                
+                if qr_codes:
+                    for qr in qr_codes:
+                        qr_data = qr.data.decode('utf-8')
+                        st.success(f"✅ QR Code found: {qr_data}")
+                        if qr_data in st.session_state.nav_data['nodes']:
+                            st.session_state.selected_node = qr_data
+                            st.info(f"📍 Node '{qr_data}' selected for navigation")
+                        else:
+                            st.warning(f"⚠️ Node '{qr_data}' not found in the system")
+                else:
+                    st.error("❌ No QR code found in the uploaded image")
+            except ImportError:
+                st.error("❌ QR code reading libraries not available. Please use the live scanner.")
+            except Exception as e:
+                st.error(f"❌ Error processing QR code: {str(e)}")
+
+# System Statistics and Overview
+def show_system_stats():
+    st.subheader("📊 System Statistics")
+    
+    nodes = st.session_state.nav_data['nodes']
+    connections = st.session_state.nav_data['connections']
+    
+    # Basic stats
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("🏢 Total Nodes", len(nodes))
+    
+    with col2:
+        total_paths = sum(len(node_data) for node_data in nodes.values())
+        st.metric("🛤️ Total Paths", total_paths)
+    
+    with col3:
+        st.metric("🔗 Total Connections", len(connections))
+    
+    with col4:
+        total_images = sum(
+            len(path_data.get('images', [])) 
+            for node_data in nodes.values() 
+            for path_data in node_data.values()
+        )
+        st.metric("🖼️ Total Images", total_images)
+    
+    # Detailed breakdown
+    st.subheader("📋 Node Details")
+    if nodes:
+        node_data = []
+        for node_name, node_paths in nodes.items():
+            paths_count = len(node_paths)
+            images_count = sum(len(path_data.get('images', [])) for path_data in node_paths.values())
+            connections_count = sum(1 for conn in connections if node_name in conn.split("::"))
+            
+            node_data.append({
+                "Node": node_name,
+                "Paths": paths_count,
+                "Images": images_count,
+                "Connections": connections_count
+            })
+        
+        st.dataframe(node_data, use_container_width=True)
+    else:
+        st.info("No nodes available")
+
+# Data Export/Import Functions
+def export_navigation_data():
+    st.subheader("📤 Export Navigation Data")
+    
+    if st.button("📋 Generate Export Data"):
+        export_data = {
+            "export_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "nav_data": st.session_state.nav_data,
+            "statistics": {
+                "total_nodes": len(st.session_state.nav_data['nodes']),
+                "total_connections": len(st.session_state.nav_data['connections']),
+                "total_paths": sum(len(node_data) for node_data in st.session_state.nav_data['nodes'].values())
+            }
+        }
+        
+        json_str = json.dumps(export_data, indent=2)
+        
+        st.download_button(
+            label="💾 Download Navigation Data",
+            data=json_str,
+            file_name=f"campus_nav_export_{int(time.time())}.json",
+            mime="application/json"
+        )
+        
+        st.success("✅ Export data generated successfully!")
+
+def import_navigation_data():
+    st.subheader("📥 Import Navigation Data")
+    
+    st.warning("⚠️ Importing will replace ALL current navigation data!")
+    
+    uploaded_file = st.file_uploader("Choose JSON file", type=['json'])
+    
+    if uploaded_file:
+        try:
+            import_data = json.load(uploaded_file)
+            
+            # Validate structure
+            if 'nav_data' in import_data and 'nodes' in import_data['nav_data'] and 'connections' in import_data['nav_data']:
+                st.success("✅ Valid navigation data file detected")
+                
+                # Show import statistics
+                if 'statistics' in import_data:
+                    stats = import_data['statistics']
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Nodes to Import", stats.get('total_nodes', 0))
+                    with col2:
+                        st.metric("Connections to Import", stats.get('total_connections', 0))
+                    with col3:
+                        st.metric("Paths to Import", stats.get('total_paths', 0))
+                
+                # Show export timestamp if available
+                if 'export_timestamp' in import_data:
+                    st.info(f"📅 Data exported on: {import_data['export_timestamp']}")
+                
+                confirm_import = st.checkbox("I confirm I want to replace all current data")
+                
+                if st.button("📥 Import Data") and confirm_import:
+                    with st.spinner("Importing navigation data..."):
+                        st.session_state.nav_data = import_data['nav_data']
+                        
+                        if save_navigation_data(st.session_state.nav_data):
+                            st.success("✅ Navigation data imported successfully!")
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to save imported data")
+            else:
+                st.error("❌ Invalid file format. Please upload a valid navigation data export.")
+        except json.JSONDecodeError:
+            st.error("❌ Invalid JSON file")
+        except Exception as e:
+            st.error(f"❌ Error importing data: {str(e)}")
+
+# QR Code Management
+def manage_qr_codes():
+    st.subheader("🏷️ QR Code Management")
+    
+    nodes = list(st.session_state.nav_data['nodes'].keys())
+    if not nodes:
+        st.info("No nodes available for QR code management")
+        return
+    
+    # Display all QR codes
+    st.write("**Available QR Codes:**")
+    
+    cols = st.columns(3)
+    for idx, node_name in enumerate(nodes):
+        with cols[idx % 3]:
+            st.write(f"**{node_name}**")
+            qr_img = get_qr_code_from_github(node_name)
+            if qr_img:
+                st.image(qr_img, caption=f"QR for {node_name}", width=150)
+                
+                # Download button for individual QR codes
+                img_bytes = io.BytesIO()
+                qr_img.save(img_bytes, format='PNG')
+                img_bytes.seek(0)
+                
+                st.download_button(
+                    label="💾 Download",
+                    data=img_bytes.getvalue(),
+                    file_name=f"qr_{node_name}.png",
+                    mime="image/png",
+                    key=f"download_qr_{node_name}"
+                )
+            else:
+                st.warning("QR not found")
+                if st.button(f"🔄 Generate", key=f"gen_qr_{node_name}"):
+                    with st.spinner(f"Generating QR for {node_name}..."):
+                        qr_path = generate_and_save_qr(node_name)
+                        if qr_path:
+                            st.success("✅ Generated!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed!")
+    
+    # Bulk operations
+    st.subheader("🔄 Bulk QR Operations")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Regenerate All QR Codes"):
+            progress_bar = st.progress(0)
+            success_count = 0
+            
+            for idx, node_name in enumerate(nodes):
+                progress_bar.progress((idx + 1) / len(nodes))
+                with st.spinner(f"Generating QR for {node_name}..."):
+                    if generate_and_save_qr(node_name):
+                        success_count += 1
+                    time.sleep(0.5)  # Small delay to show progress
+            
+            progress_bar.empty()
+            st.success(f"✅ Generated {success_count}/{len(nodes)} QR codes successfully!")
+            time.sleep(1)
+            st.rerun()
+    
+    with col2:
+        # Download all QR codes as ZIP
+        if st.button("📦 Download All QR Codes"):
+            import zipfile
+            
+            zip_buffer = io.BytesIO()
+            
+            with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+                for node_name in nodes:
+                    qr_img = get_qr_code_from_github(node_name)
+                    if qr_img:
+                        img_bytes = io.BytesIO()
+                        qr_img.save(img_bytes, format='PNG')
+                        zip_file.writestr(f"qr_{node_name}.png", img_bytes.getvalue())
+            
+            zip_buffer.seek(0)
+            
+            st.download_button(
+                label="💾 Download QR Codes ZIP",
+                data=zip_buffer.getvalue(),
+                file_name=f"campus_qr_codes_{int(time.time())}.zip",
+                mime="application/zip"
+            )
+
+# Image Gallery Management
+def manage_image_gallery():
+    st.subheader("🖼️ Image Gallery")
+    
+    # Collect all images
+    all_images = {}
+    for node_name, node_data in st.session_state.nav_data['nodes'].items():
+        for path_key, path_data in node_data.items():
+            if 'images' in path_data and path_data['images']:
+                for img_path in path_data['images']:
+                    all_images[img_path] = {
+                        'node': node_name,
+                        'path': path_key,
+                        'label': path_data.get('label', 'Unknown')
+                    }
+    
+    if not all_images:
+        st.info("No images found in the system")
+        return
+    
+    st.write(f"**Total Images: {len(all_images)}**")
+    
+    # Filter options
+    nodes = list(set(info['node'] for info in all_images.values()))
+    selected_node_filter = st.selectbox("Filter by Node", ["All"] + nodes)
+    
+    # Display images
+    filtered_images = all_images
+    if selected_node_filter != "All":
+        filtered_images = {path: info for path, info in all_images.items() 
+                          if info['node'] == selected_node_filter}
+    
+    # Grid display
+    cols = st.columns(3)
+    for idx, (img_path, img_info) in enumerate(filtered_images.items()):
+        with cols[idx % 3]:
+            img = get_image_from_github(img_path)
+            if img:
+                st.image(img, caption=f"{img_info['node']} - {img_info['label']}", 
+                        use_column_width=True)
+                
+                # Image details
+                st.write(f"**Node:** {img_info['node']}")
+                st.write(f"**Path:** {img_info['label']}")
+                st.write(f"**File:** {img_path.split('/')[-1]}")
+                
+                # Delete button
+                if st.button(f"🗑️ Delete", key=f"del_img_{idx}"):
+                    if delete_file(img_path):
+                        # Remove from nav_data
+                        node_data = st.session_state.nav_data['nodes'][img_info['node']]
+                        path_data = node_data[img_info['path']]
+                        if img_path in path_data['images']:
+                            path_data['images'].remove(img_path)
+                        
+                        if save_navigation_data(st.session_state.nav_data):
+                            st.success("✅ Image deleted!")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to update data")
+                    else:
+                        st.error("❌ Failed to delete image")
+            else:
+                st.error(f"Failed to load: {img_path.split('/')[-1]}")
 
 # Main Application
 def main():
+    st.set_page_config(
+        page_title="🗺️ Campus Navigator", 
+        page_icon="🗺️", 
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    st.title("🗺️ Campus Navigator")
+    st.markdown("*Navigate your campus with ease using QR codes and interactive maps*")
+    
     # Check GitHub configuration
     if not GITHUB_TOKEN or not GITHUB_REPO:
-        st.error("GitHub configuration missing. Please set GITHUB_TOKEN and GITHUB_REPO in Streamlit secrets.")
-        st.info("Required secrets: GITHUB_TOKEN, GITHUB_REPO")
-        return
+        st.error("❌ GitHub configuration missing. Please set GITHUB_TOKEN and GITHUB_REPO in Streamlit secrets.")
+        st.stop()
     
-    st.sidebar.title("Smart Campus Navigator")
-    mode = st.sidebar.radio("Mode", ["User", "Admin"])
-    
-    if mode == "Admin":
-        st.title("System Administration")
-        
-        admin_action = st.selectbox(
-            "Select Action",
-            ["Create Node", "Link Nodes", "Delete Node", "Delete Path", "Delete Connection"]
-        )
-        
-        if admin_action == "Create Node":
-            handle_node_creation()
-        elif admin_action == "Link Nodes":
-            handle_node_linking()
-        elif admin_action == "Delete Node":
-            delete_node()
-        elif admin_action == "Delete Path":
-            delete_path()
-        elif admin_action == "Delete Connection":
-            delete_link()
-        
-        st.markdown("---")
-        show_graph()
-        st.markdown("---")
-        show_interactive_graph()
-
-    else:
-        st.title("Campus Navigation")
-        node_keys = list(st.session_state.nav_data['nodes'].keys())
-        
-        if not node_keys:
-            st.info("No nodes available. Please add nodes in Admin mode.")
-            return
-        
-        user_mode = st.radio("Navigation Mode", ["QR Scanner Mode", "Manual Selection Mode"])
-        
-        if user_mode == "QR Scanner Mode":
-            st.subheader("Step 1: Scan QR Code for Source Node")
-            qr_code = qrcode_scanner()
-
-            if qr_code:
-                if qr_code in node_keys:
-                    st.session_state.selected_node = qr_code
-                    st.success(f"Source node detected: {qr_code}")
-                else:
-                    st.error("Scanned QR does not match any node.")
-
-            if st.session_state.selected_node:
-                source = st.session_state.selected_node
-                st.info(f"Source: {source}")
-                destination_options = [n for n in node_keys if n != source]
-                if not destination_options:
-                    st.warning("No other nodes available as destination.")
-                    return
-                destination = st.selectbox("Step 2: Select Destination Node", destination_options)
-                
-                if st.button("Get Directions"):
-                    with st.spinner("Finding optimal path..."):
-                        path, total_distance, G = find_path_with_weight(source, destination)
-                        if path:
-                            st.success(f"Path found! Total distance: {total_distance:.1f} feet")
-                            show_path_graph_with_weights(path, total_distance)
-                            st.markdown("---")
-                            st.subheader("Step-by-Step Navigation")
-                            display_navigation(path)
-                        else:
-                            st.error("No path found")
+    # Initialize GitHub structure if needed
+    if not st.session_state.get('github_initialized', False):
+        with st.spinner("Initializing GitHub structure..."):
+            if initialize_github_structure():
+                st.session_state.github_initialized = True
             else:
-                st.info("Please scan a QR code to set the source node.")
-
-        else:  # Manual Selection Mode
-            st.subheader("Manual Navigation")
-            col1, col2 = st.columns(2)
+                st.error("Failed to initialize GitHub structure")
+                st.stop()
+    
+    # Sidebar Navigation
+    st.sidebar.title("🧭 Navigation")
+    page = st.sidebar.selectbox(
+        "Choose Function",
+        ["🏠 Home", "📱 QR Scanner", "🗺️ Find Path", "🔧 Admin Panel"]
+    )
+    
+    # Main Content
+    if page == "🏠 Home":
+        st.header("Welcome to Campus Navigator!")
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown("""
+            ### 🎯 Features:
+            - **📱 QR Code Scanning**: Scan QR codes at campus locations
+            - **🗺️ Smart Navigation**: Find optimal paths between locations
+            - **📸 Visual Directions**: Step-by-step instructions with images
+            - **🏛️ Landmark Recognition**: Navigate using familiar landmarks
+            - **📊 Interactive Maps**: Visualize the entire campus network
             
-            with col1:
-                source = st.selectbox("Select Source Node", node_keys, key="manual_source")
+            ### 🚀 How to Use:
+            1. **Scan QR Code**: Use the QR scanner to identify your location
+            2. **Select Destination**: Choose where you want to go
+            3. **Follow Directions**: Get step-by-step navigation with images
+            4. **Reach Destination**: Arrive at your destination efficiently!
+            """)
+        
+        with col2:
+            # Quick stats
+            nodes_count = len(st.session_state.nav_data['nodes'])
+            connections_count = len(st.session_state.nav_data['connections'])
             
-            with col2:
-                destination_options = [n for n in node_keys if n != source]
-                destination = st.selectbox("Select Destination Node", destination_options, key="manual_destination")
+            st.markdown("### 📊 Quick Stats")
+            st.metric("Campus Locations", nodes_count)
+            st.metric("Available Routes", connections_count)
             
-            if st.button("Get Directions", key="manual_directions"):
-                with st.spinner("Finding optimal path..."):
-                    path, total_distance, G = find_path_with_weight(source, destination)
+            if nodes_count > 0:
+                st.success("✅ System Ready!")
+            else:
+                st.warning("⚠️ No locations configured")
+        
+        # Show campus overview
+        if st.session_state.nav_data['nodes']:
+            st.header("🗺️ Campus Overview")
+            show_full_graph()
+    
+    elif page == "📱 QR Scanner":
+        st.header("📱 QR Code Scanner")
+        handle_qr_scanner()
+        
+        # Show selected node info
+        if st.session_state.selected_node:
+            st.success(f"📍 Current Location: **{st.session_state.selected_node}**")
+            
+            # Quick navigation from current location
+            st.subheader("🎯 Quick Navigation")
+            available_destinations = [n for n in st.session_state.nav_data['nodes'].keys() 
+                                    if n != st.session_state.selected_node]
+            
+            if available_destinations:
+                destination = st.selectbox("Where do you want to go?", available_destinations)
+                
+                if st.button("🧭 Get Directions"):
+                    path = find_path(st.session_state.selected_node, destination)
                     if path:
-                        st.success(f"Path found! Total distance: {total_distance:.1f} feet")
-                        show_path_graph_with_weights(path, total_distance)
-                        st.markdown("---")
-                        st.subheader("Step-by-Step Navigation")
+                        st.success(f"✅ Route found! {len(path)-1} steps to {destination}")
                         display_navigation(path)
                     else:
-                        st.error("No path found")
+                        st.error("❌ No route found to destination")
+            else:
+                st.info("No other destinations available")
+    
+    elif page == "🗺️ Find Path":
+        st.header("🗺️ Path Finding")
         
-        st.markdown("---")
-        show_interactive_graph()
+        nodes = list(st.session_state.nav_data['nodes'].keys())
+        if len(nodes) < 2:
+            st.warning("⚠️ At least 2 nodes are required for path finding")
+            st.info("Please add more nodes in the Admin Panel")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            start_node = st.selectbox("📍 Starting Point", nodes, 
+                                    index=nodes.index(st.session_state.selected_node) 
+                                    if st.session_state.selected_node in nodes else 0)
+        
+        with col2:
+            available_destinations = [n for n in nodes if n != start_node]
+            end_node = st.selectbox("🎯 Destination", available_destinations)
+        
+        if st.button("🔍 Find Best Route"):
+            with st.spinner("Calculating optimal route..."):
+                path, total_distance, graph = find_path_with_weight(start_node, end_node)
+                
+                if path:
+                    st.success(f"✅ Route Found! Distance: {total_distance:.1f} ft, Steps: {len(path)-1}")
+                    
+                    # Show path visualization
+                    show_path_graph_with_weights(path, total_distance)
+                    
+                    # Show detailed navigation
+                    st.header("📋 Step-by-Step Directions")
+                    display_navigation(path)
+                else:
+                    st.error("❌ No route found between selected locations")
+                    st.info("Check if the locations are connected in the Admin Panel")
+    
+    elif page == "🔧 Admin Panel":
+        st.header("🔧 Admin Panel")
+        
+        # Authentication could be added here
+        admin_tabs = st.tabs([
+            "🏢 Manage Nodes", 
+            "🔗 Link Nodes", 
+            "🗑️ Delete Items",
+            "📊 Statistics",
+            "🏷️ QR Codes",
+            "🖼️ Images",
+            "💾 Data Management"
+        ])
+        
+        with admin_tabs[0]:
+            handle_node_creation()
+        
+        with admin_tabs[1]:
+            handle_node_linking()
+        
+        with admin_tabs[2]:
+            delete_tab1, delete_tab2, delete_tab3 = st.tabs(["🏢 Delete Node", "🛤️ Delete Path", "🔗 Delete Link"])
+            
+            with delete_tab1:
+                delete_node()
+            
+            with delete_tab2:
+                delete_path()
+            
+            with delete_tab3:
+                delete_link()
+        
+        with admin_tabs[3]:
+            show_system_stats()
+        
+        with admin_tabs[4]:
+            manage_qr_codes()
+        
+        with admin_tabs[5]:
+            manage_image_gallery()
+        
+        with admin_tabs[6]:
+            data_tab1, data_tab2 = st.tabs(["📤 Export", "📥 Import"])
+            
+            with data_tab1:
+                export_navigation_data()
+            
+            with data_tab2:
+                import_navigation_data()
 
 if __name__ == "__main__":
     main()
