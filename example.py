@@ -511,9 +511,345 @@ def find_path_with_weight(start, end):
     except (nx.NetworkXNoPath, nx.NodeNotFound):
         return None, 0, G
 
+def is_mobile_device():
+    """Detect if user is on mobile device"""
+    # This would typically use user agent detection in a real app
+    # For Streamlit, we can use JavaScript or assume mobile based on screen size
+    return True  # Assume mobile for enhanced experience
+
+# Custom CSS injection function for mobile optimization
+def inject_mobile_css():
+    """Inject mobile-optimized CSS"""
+    st.markdown("""
+    <style>
+    /* Mobile-first responsive design */
+    @media (max-width: 768px) {
+        .stButton > button {
+            width: 100%;
+            padding: 12px;
+            font-size: 16px;
+            margin: 5px 0;
+        }
+        
+        .stSelectbox > div > div {
+            font-size: 16px;
+        }
+        
+        /* Make QR scanner full width on mobile */
+        .stCamera > div {
+            width: 100% !important;
+            max-width: none !important;
+        }
+        
+        /* Enhance touch targets */
+        .stRadio > div {
+            gap: 15px;
+        }
+        
+        .stRadio > div > label {
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(0,0,0,0.05);
+        }
+    }
+    
+    /* Camera preview enhancements */
+    video {
+        border-radius: 15px !important;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
+    }
+    
+    /* Success/Error message styling */
+    .stSuccess, .stError {
+        font-size: 18px;
+        padding: 15px;
+        border-radius: 10px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 def find_path(start, end):
     path, _, _ = find_path_with_weight(start, end)
     return path
+
+
+# Enhanced QR Scanner with mobile-friendly features
+def enhanced_qr_scanner():
+    st.subheader("📱 QR Scanner")
+    
+    # Add custom CSS for mobile optimization
+    st.markdown("""
+    <style>
+    .qr-scanner-container {
+        width: 100%;
+        max-width: 100vw;
+        height: 70vh;
+        position: relative;
+        border-radius: 15px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    
+    .scanner-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        z-index: 10;
+        pointer-events: none;
+    }
+    
+    .scanner-frame {
+        position: absolute;
+        top: 15%;
+        left: 10%;
+        right: 10%;
+        bottom: 15%;
+        border: 3px solid #00ff00;
+        border-radius: 20px;
+        box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
+        animation: scanner-pulse 2s infinite;
+    }
+    
+    @keyframes scanner-pulse {
+        0% { border-color: #00ff00; }
+        50% { border-color: #00aa00; }
+        100% { border-color: #00ff00; }
+    }
+    
+    .scanner-corners {
+        position: absolute;
+        width: 50px;
+        height: 50px;
+        border: 4px solid #00ff00;
+    }
+    
+    .corner-tl { top: -2px; left: -2px; border-right: none; border-bottom: none; }
+    .corner-tr { top: -2px; right: -2px; border-left: none; border-bottom: none; }
+    .corner-bl { bottom: -2px; left: -2px; border-right: none; border-top: none; }
+    .corner-br { bottom: -2px; right: -2px; border-left: none; border-top: none; }
+    
+    .zoom-controls {
+        position: absolute;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 20;
+        display: flex;
+        gap: 10px;
+        background: rgba(0,0,0,0.7);
+        padding: 10px;
+        border-radius: 25px;
+    }
+    
+    .zoom-btn {
+        background: rgba(255,255,255,0.2);
+        border: 2px solid white;
+        color: white;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        font-size: 20px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+    
+    .zoom-btn:hover {
+        background: rgba(255,255,255,0.4);
+    }
+    
+    .scanner-instructions {
+        position: absolute;
+        top: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: white;
+        text-align: center;
+        background: rgba(0,0,0,0.7);
+        padding: 10px 20px;
+        border-radius: 20px;
+        z-index: 20;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Initialize zoom level in session state
+    if 'zoom_level' not in st.session_state:
+        st.session_state.zoom_level = 1.0
+    
+    # Zoom controls
+    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
+    
+    with col1:
+        if st.button("🔍➖", help="Zoom Out"):
+            st.session_state.zoom_level = max(0.5, st.session_state.zoom_level - 0.2)
+            st.rerun()
+    
+    with col2:
+        if st.button("🔍➕", help="Zoom In"):
+            st.session_state.zoom_level = min(3.0, st.session_state.zoom_level + 0.2)
+            st.rerun()
+    
+    with col3:
+        if st.button("🎯", help="Reset Zoom"):
+            st.session_state.zoom_level = 1.0
+            st.rerun()
+    
+    with col4:
+        if st.button("🔦", help="Toggle Flash"):
+            st.info("Flash toggle requested")
+    
+    with col5:
+        st.write(f"Zoom: {st.session_state.zoom_level:.1f}x")
+    
+    # Display current zoom level
+    st.info(f"📱 Camera Zoom: {st.session_state.zoom_level:.1f}x | Point camera at QR code within the green frame")
+    
+    # Enhanced QR scanner with larger box and mobile optimization
+    qr_code = qrcode_scanner(
+        key='enhanced_qrcode_scanner',
+        # Significantly larger box size for mobile
+        box_size=min(st.session_state.get('window_width', 800), 600),
+        # Enhanced scanner parameters
+        fps_limit=30,
+        torch=False,  # Flash control
+        # Custom styling for mobile
+        style={
+            'width': '100%',
+            'height': '70vh',
+            'border-radius': '15px',
+            'border': '3px solid #4CAF50',
+            'box-shadow': '0 4px 20px rgba(0,0,0,0.3)'
+        }
+    )
+    
+    # Add scanning overlay effect
+    st.markdown("""
+    <div class="scanner-overlay">
+        <div class="scanner-frame">
+            <div class="scanner-corners corner-tl"></div>
+            <div class="scanner-corners corner-tr"></div>
+            <div class="scanner-corners corner-bl"></div>
+            <div class="scanner-corners corner-br"></div>
+        </div>
+        <div class="scanner-instructions">
+            <div>📱 Hold phone steady</div>
+            <div>🎯 Align QR code in green frame</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if qr_code:
+        node_name = qr_code
+        if node_name in st.session_state.nav_data['nodes']:
+            st.session_state.selected_node = node_name
+            st.success(f"✅ Scanned Node: {node_name}")
+            st.balloons()  # Celebration effect
+            return node_name
+        else:
+            st.error("❌ Scanned QR code not found in database.")
+            st.info("💡 Make sure you're scanning a valid campus navigation QR code")
+    
+    return None
+
+# Alternative mobile-optimized QR scanner function
+def mobile_qr_scanner():
+    """Mobile-optimized QR scanner with full-screen experience"""
+    st.subheader("📱 Mobile QR Scanner")
+    
+    # Add JavaScript for mobile optimization
+    st.markdown("""
+    <script>
+    // Mobile optimization script
+    function optimizeForMobile() {
+        // Get screen dimensions
+        const screenWidth = window.screen.width;
+        const screenHeight = window.screen.height;
+        
+        // Set scanner size based on screen
+        const scannerSize = Math.min(screenWidth * 0.9, screenHeight * 0.6);
+        
+        // Store in session for Python access
+        window.parent.postMessage({
+            type: 'screenInfo',
+            width: screenWidth,
+            height: screenHeight,
+            scannerSize: scannerSize
+        }, '*');
+    }
+    
+    // Call on load
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', optimizeForMobile);
+    } else {
+        optimizeForMobile();
+    }
+    </script>
+    """, unsafe_allow_html=True)
+    
+    # Mobile-specific controls
+    st.markdown("### 📱 Camera Controls")
+    
+    # Create responsive layout
+    control_cols = st.columns([2, 2, 2, 2])
+    
+    with control_cols[0]:
+        zoom_out = st.button("🔍➖ Zoom Out", use_container_width=True)
+    with control_cols[1]:
+        zoom_in = st.button("🔍➕ Zoom In", use_container_width=True)
+    with control_cols[2]:
+        reset_zoom = st.button("🎯 Reset", use_container_width=True)
+    with control_cols[3]:
+        toggle_flash = st.button("🔦 Flash", use_container_width=True)
+    
+    # Handle zoom controls
+    if zoom_out:
+        st.session_state.zoom_level = max(0.5, st.session_state.get('zoom_level', 1.0) - 0.25)
+    if zoom_in:
+        st.session_state.zoom_level = min(4.0, st.session_state.get('zoom_level', 1.0) + 0.25)
+    if reset_zoom:
+        st.session_state.zoom_level = 1.0
+    
+    # Display zoom level
+    zoom_level = st.session_state.get('zoom_level', 1.0)
+    st.info(f"🔍 Current Zoom: {zoom_level:.1f}x")
+    
+    # Enhanced scanner with mobile-first approach
+    scanner_container = st.container()
+    
+    with scanner_container:
+        # Use larger box size for mobile
+        mobile_box_size = 800  # Increased from default
+        
+        qr_code = qrcode_scanner(
+            key='mobile_qr_scanner',
+            box_size=mobile_box_size,
+            fps_limit=24,  # Optimized for mobile
+            torch=st.session_state.get('flash_enabled', False)
+        )
+        
+        # Add mobile-friendly instructions
+        st.markdown("""
+        <div style="
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            text-align: center;
+            margin: 10px 0;
+        ">
+            <h4>📱 Scanning Instructions</h4>
+            <p>• Hold your phone steady</p>
+            <p>• Point camera at QR code</p>
+            <p>• Move closer or farther to focus</p>
+            <p>• Use zoom controls if needed</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    return qr_code
+
 
 # Improved Visualization Functions with better sizing and responsiveness
 def show_path_graph_with_weights(path, total_distance):
@@ -682,19 +1018,13 @@ def show_interactive_graph():
 
 # QR Scanner
 def qr_scanner():
-    qr_code = qrcode_scanner(key='qrcode_scanner', box_size=800)
-    if qr_code:
-        node_name = qr_code
-        if node_name in st.session_state.nav_data['nodes']:
-            st.session_state.selected_node = node_name
-            st.success(f"Scanned Node: {node_name}")
-            return node_name
-        else:
-            st.error("Scanned node not found in database.")
-    return None
+    """Enhanced QR Scanner - use this to replace the original function"""
+    return enhanced_qr_scanner()
+
 
 # Main Application
 def main():
+    inject_mobile_css()
     # Set page config for better layout
     st.set_page_config(
         page_title="Smart Campus Navigator",
@@ -748,7 +1078,7 @@ def main():
         
         if user_mode == "QR Scanner Mode":
             st.subheader("📱 Step 1: Scan QR Code for Source Node")
-            qr_code = qrcode_scanner()
+            qr_code = enhanced_qr_scanner() 
 
             if qr_code:
                 if qr_code in node_keys:
