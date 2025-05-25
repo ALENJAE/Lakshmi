@@ -767,19 +767,29 @@ def show_full_graph():
         
         if path_key in st.session_state.nav_data['nodes'][source]:
             distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
-            label = st.session_state.nav_data['nodes'][source][path_key]['label']
+            # Only show weight/distance, no path label
             edges.append(Edge(source=source, target=target, 
-                            label=f"{label}\n{distance}ft", color="#4CAF50"))
+                            label=f"{distance}ft", color="#4CAF50"))
 
-    config = Config(width=800, height=600, directed=True, physics=True, 
-                   hierarchical=False, nodeHighlightBehavior=True, 
-                   highlightColor="#F0F8FF", maxZoom=2, minZoom=0.1)
+    # Non-interactive configuration - static map-like view
+    config = Config(
+        width=800, 
+        height=600, 
+        directed=True, 
+        physics=False,  # Disable physics for static positioning
+        hierarchical=False, 
+        nodeHighlightBehavior=False,  # Disable interactions
+        highlightColor="#F0F8FF", 
+        maxZoom=1,  # Fixed zoom
+        minZoom=1,  # Fixed zoom
+        initialZoom=1,
+        staticGraph=True  # Make it static
+    )
     
     if nodes:
         agraph(nodes=nodes, edges=edges, config=config)
     else:
         st.info("No nodes available. Create some nodes first!")
-
 # QR Code Scanner Integration
 def handle_qr_scanner():
     st.subheader("📱 QR Code Scanner")
