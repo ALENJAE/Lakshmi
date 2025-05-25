@@ -752,6 +752,7 @@ def show_path_graph_with_weights(path, total_distance):
         agraph(nodes=nodes, edges=edges, config=config)
     else:
         st.warning("No path visualization available")
+
 def show_full_graph():
     st.subheader("🗺️ Complete Campus Network")
     
@@ -776,6 +777,8 @@ def show_full_graph():
         
         if path_key in st.session_state.nav_data['nodes'][source]:
             distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
+            # Scale edge length based on distance (weight)
+            edge_length = max(50, min(300, distance * 2))  # Scale between 50-300px
             # Only show weight/distance, no path label
             edges.append(Edge(
                 source=source, 
@@ -783,6 +786,7 @@ def show_full_graph():
                 label=f"{distance}ft", 
                 color="#4CAF50",
                 width=2,
+                length=edge_length,  # Dynamic length based on weight
                 font={"size": 10, "color": "#333333", "strokeWidth": 0}
             ))
     
@@ -791,48 +795,72 @@ def show_full_graph():
         width=800,
         height=600,
         directed=True,
-        physics=False,  # Disable physics for static positioning
+        physics=True,  # Enable physics for edge length control
         hierarchical=False,
         nodeHighlightBehavior=False,  # Disable node highlighting
         link={"highlightColor": "rgba(0,0,0,0)"},  # Disable link highlighting
         node={
             "highlightStrokeColor": "rgba(0,0,0,0)",  # Disable node highlight
             "labelProperty": "label",
-            "renderLabel": True
+            "renderLabel": True,
+            "fixed": True  # Keep nodes fixed in position
         },
         maxZoom=2.0,  # Allow some zoom for navigation
         minZoom=0.5,  # Allow zoom out
         initialZoom=1.0,
-        staticGraph=False,  # Allow panning but disable node dragging
-        staticGraphWithDragAndDrop=False,  # Prevent node dragging
+        staticGraph=True,  # Make graph static
+        staticGraphWithDragAndDrop=False,  # Prevent node dragging completely
         panAndZoom=True,  # Enable pan and zoom for navigation
         zoomScaleExtent=[0.5, 2.0],  # Limit zoom range
         d3={
-            "alphaTarget": 0,
+            "alphaTarget": 0.1,  # Minimal movement
             "gravity": 0,
             "linkDistance": 100,
-            "linkStrength": 0
+            "linkStrength": 0.1,  # Minimal link strength
+            "velocityDecay": 0.9  # Quick stabilization
         }
     )
     
     if nodes:
-        # Apply custom CSS to ensure light background and prevent node size changes
+        # Apply custom CSS for checkered background and prevent node interactions
         st.markdown("""
         <style>
         .agraph-container {
-            background-color: #f8f9fa !important;
+            background: linear-gradient(45deg, #f0f0f0 25%, transparent 25%), 
+                        linear-gradient(-45deg, #f0f0f0 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #f0f0f0 75%), 
+                        linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #ffffff;
             border: 1px solid #dee2e6;
             border-radius: 8px;
         }
         
-        /* Ensure nodes maintain fixed size during zoom */
+        /* Ensure nodes maintain fixed size during zoom and cannot be dragged */
         .agraph-container svg g.nodes circle {
             r: 20px !important;
+            pointer-events: none !important;  /* Disable mouse interactions */
         }
         
-        /* Light background for better visibility */
+        .agraph-container svg g.nodes text {
+            pointer-events: none !important;  /* Disable text interactions */
+        }
+        
+        /* Light checkered pattern background for better visibility */
         .agraph-container svg {
+            background: linear-gradient(45deg, #f8f9fa 25%, transparent 25%), 
+                        linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), 
+                        linear-gradient(45deg, transparent 75%, #f8f9fa 75%), 
+                        linear-gradient(-45deg, transparent 75%, #f8f9fa 75%);
+            background-size: 30px 30px;
+            background-position: 0 0, 0 15px, 15px -15px, -15px 0px;
             background-color: #ffffff !important;
+        }
+        
+        /* Disable node dragging completely */
+        .agraph-container .drag {
+            pointer-events: none !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -840,6 +868,7 @@ def show_full_graph():
         agraph(nodes=nodes, edges=edges, config=config)
     else:
         st.info("No nodes available. Create some nodes first!")
+
 # QR Code Scanner Integration
 def handle_qr_scanner():
     st.subheader("📱 QR Code Scanner")
