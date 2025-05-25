@@ -757,8 +757,17 @@ def show_full_graph():
     
     nodes = []
     for node_name in st.session_state.nav_data['nodes']:
-        nodes.append(Node(id=node_name, label=node_name, color="#2196F3", size=20))
-
+        nodes.append(Node(
+            id=node_name, 
+            label=node_name, 
+            color="#2196F3", 
+            size=20,
+            font={"size": 12, "color": "#000000"},  # Fixed font size and color
+            borderWidth=2,
+            borderWidthSelected=2,  # Prevent border change on selection
+            scaling={"min": 20, "max": 20}  # Lock node size
+        ))
+    
     edges = []
     for conn, details in st.session_state.nav_data['connections'].items():
         source = details['from']
@@ -768,25 +777,66 @@ def show_full_graph():
         if path_key in st.session_state.nav_data['nodes'][source]:
             distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
             # Only show weight/distance, no path label
-            edges.append(Edge(source=source, target=target, 
-                            label=f"{distance}ft", color="#4CAF50"))
-
-    # Non-interactive configuration - static map-like view
+            edges.append(Edge(
+                source=source, 
+                target=target, 
+                label=f"{distance}ft", 
+                color="#4CAF50",
+                width=2,
+                font={"size": 10, "color": "#333333", "strokeWidth": 0}
+            ))
+    
+    # Fixed configuration for static map-like view
     config = Config(
-        width=800, 
-        height=600, 
-        directed=True, 
+        width=800,
+        height=600,
+        directed=True,
         physics=False,  # Disable physics for static positioning
-        hierarchical=False, 
-        nodeHighlightBehavior=False,  # Disable interactions
-        highlightColor="#F0F8FF", 
-        maxZoom=1,  # Fixed zoom
-        minZoom=1,  # Fixed zoom
-        initialZoom=1,
-        staticGraph=True  # Make it static
+        hierarchical=False,
+        nodeHighlightBehavior=False,  # Disable node highlighting
+        link={"highlightColor": "rgba(0,0,0,0)"},  # Disable link highlighting
+        node={
+            "highlightStrokeColor": "rgba(0,0,0,0)",  # Disable node highlight
+            "labelProperty": "label",
+            "renderLabel": True
+        },
+        maxZoom=2.0,  # Allow some zoom for navigation
+        minZoom=0.5,  # Allow zoom out
+        initialZoom=1.0,
+        staticGraph=False,  # Allow panning but disable node dragging
+        staticGraphWithDragAndDrop=False,  # Prevent node dragging
+        panAndZoom=True,  # Enable pan and zoom for navigation
+        zoomScaleExtent=[0.5, 2.0],  # Limit zoom range
+        d3={
+            "alphaTarget": 0,
+            "gravity": 0,
+            "linkDistance": 100,
+            "linkStrength": 0
+        }
     )
     
     if nodes:
+        # Apply custom CSS to ensure light background and prevent node size changes
+        st.markdown("""
+        <style>
+        .agraph-container {
+            background-color: #f8f9fa !important;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+        }
+        
+        /* Ensure nodes maintain fixed size during zoom */
+        .agraph-container svg g.nodes circle {
+            r: 20px !important;
+        }
+        
+        /* Light background for better visibility */
+        .agraph-container svg {
+            background-color: #ffffff !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
         agraph(nodes=nodes, edges=edges, config=config)
     else:
         st.info("No nodes available. Create some nodes first!")
