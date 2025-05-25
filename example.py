@@ -234,43 +234,53 @@ def handle_node_linking():
         st.rerun()
 
 def enhanced_mobile_qr_scanner():
-    """Custom mobile-optimized QR scanner with full camera control"""
+    """Custom mobile-optimized QR scanner with fixed control buttons"""
     
     st.subheader("📱 Enhanced Mobile QR Scanner")
     
-    # Custom HTML with full camera control
+    # Custom HTML with improved mobile controls
     html_code = """
     <!DOCTYPE html>
     <html>
     <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
         <script src="https://cdnjs.cloudflare.com/ajax/libs/qr-scanner/1.4.2/qr-scanner.umd.min.js"></script>
         <style>
+            * {
+                box-sizing: border-box;
+                -webkit-tap-highlight-color: transparent;
+            }
+            
             body {
                 margin: 0;
-                padding: 10px;
+                padding: 0;
                 background: #000;
-                font-family: Arial, sans-serif;
-                overflow-x: hidden;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+                overflow: hidden;
+                touch-action: manipulation;
             }
             
             .scanner-container {
                 position: relative;
                 width: 100vw;
-                height: 80vh;
-                max-width: 100%;
-                margin: 0 auto;
-                border-radius: 20px;
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            
+            .video-container {
+                position: relative;
+                flex: 1;
+                width: 100%;
                 overflow: hidden;
-                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
             }
             
             #video-preview {
                 width: 100%;
                 height: 100%;
                 object-fit: cover;
-                transform-origin: center;
-                transition: transform 0.3s ease;
+                transform-origin: center center;
+                transition: transform 0.2s ease;
             }
             
             .scanner-overlay {
@@ -287,74 +297,28 @@ def enhanced_mobile_qr_scanner():
             }
             
             .scanner-frame {
-                width: 70vw;
-                height: 70vw;
-                max-width: 300px;
-                max-height: 300px;
+                width: min(70vw, 70vh);
+                height: min(70vw, 70vh);
+                max-width: 280px;
+                max-height: 280px;
                 border: 4px solid #00ff41;
                 border-radius: 20px;
                 position: relative;
                 animation: scanner-pulse 2s infinite;
                 box-shadow: 
-                    0 0 0 4px rgba(0,255,65,0.2),
+                    0 0 0 2px rgba(0,255,65,0.2),
                     0 0 20px rgba(0,255,65,0.3);
             }
             
             @keyframes scanner-pulse {
                 0%, 100% { 
                     border-color: #00ff41; 
-                    box-shadow: 0 0 0 4px rgba(0,255,65,0.2), 0 0 20px rgba(0,255,65,0.3);
+                    box-shadow: 0 0 0 2px rgba(0,255,65,0.2), 0 0 20px rgba(0,255,65,0.3);
                 }
                 50% { 
                     border-color: #00cc33; 
-                    box-shadow: 0 0 0 8px rgba(0,255,65,0.4), 0 0 30px rgba(0,255,65,0.5);
+                    box-shadow: 0 0 0 4px rgba(0,255,65,0.4), 0 0 25px rgba(0,255,65,0.5);
                 }
-            }
-            
-            .scanner-corners {
-                position: absolute;
-                width: 30px;
-                height: 30px;
-                border: 6px solid #00ff41;
-                border-radius: 4px;
-            }
-            
-            .corner-tl { top: -15px; left: -15px; border-right: none; border-bottom: none; }
-            .corner-tr { top: -15px; right: -15px; border-left: none; border-bottom: none; }
-            .corner-bl { bottom: -15px; left: -15px; border-right: none; border-top: none; }
-            .corner-br { bottom: -15px; right: -15px; border-left: none; border-top: none; }
-            
-            .controls {
-                position: absolute;
-                bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                display: flex;
-                gap: 15px;
-                z-index: 100;
-            }
-            
-            .control-btn {
-                width: 60px;
-                height: 60px;
-                border-radius: 50%;
-                border: 3px solid white;
-                background: rgba(0,0,0,0.7);
-                color: white;
-                font-size: 18px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                transition: all 0.3s ease;
-                user-select: none;
-                -webkit-tap-highlight-color: transparent;
-            }
-            
-            .control-btn:hover, .control-btn:active {
-                background: rgba(0,255,65,0.3);
-                border-color: #00ff41;
-                transform: scale(1.1);
             }
             
             .instructions {
@@ -362,27 +326,106 @@ def enhanced_mobile_qr_scanner():
                 top: 20px;
                 left: 50%;
                 transform: translateX(-50%);
-                background: rgba(0,0,0,0.8);
+                background: rgba(0,0,0,0.85);
                 color: white;
-                padding: 15px 25px;
-                border-radius: 25px;
+                padding: 12px 20px;
+                border-radius: 20px;
                 text-align: center;
                 font-size: 14px;
+                font-weight: 500;
                 z-index: 100;
                 max-width: 90%;
+                backdrop-filter: blur(10px);
             }
             
             .zoom-display {
                 position: absolute;
                 top: 50%;
-                right: 20px;
+                right: 15px;
                 transform: translateY(-50%);
-                background: rgba(0,0,0,0.8);
+                background: rgba(0,0,0,0.85);
                 color: white;
-                padding: 10px 15px;
-                border-radius: 15px;
-                font-size: 16px;
+                padding: 8px 12px;
+                border-radius: 12px;
+                font-size: 14px;
+                font-weight: bold;
                 z-index: 100;
+                backdrop-filter: blur(10px);
+            }
+            
+            .controls-panel {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                background: rgba(0,0,0,0.9);
+                backdrop-filter: blur(15px);
+                padding: 20px;
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                z-index: 200;
+                border-top: 1px solid rgba(255,255,255,0.1);
+            }
+            
+            .control-btn {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                border: 3px solid rgba(255,255,255,0.8);
+                background: rgba(255,255,255,0.1);
+                color: white;
+                font-size: 20px;
+                font-weight: bold;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.2s ease;
+                user-select: none;
+                touch-action: manipulation;
+                backdrop-filter: blur(10px);
+                position: relative;
+                overflow: hidden;
+            }
+            
+            .control-btn::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(255,255,255,0.1);
+                border-radius: 50%;
+                transform: scale(0);
+                transition: transform 0.2s ease;
+            }
+            
+            .control-btn:active::before {
+                transform: scale(1);
+            }
+            
+            .control-btn:active {
+                transform: scale(0.95);
+                border-color: #00ff41;
+                background: rgba(0,255,65,0.2);
+            }
+            
+            .control-btn.active {
+                background: rgba(255,193,7,0.3);
+                border-color: #ffc107;
+                color: #ffc107;
+            }
+            
+            .btn-label {
+                position: absolute;
+                bottom: -25px;
+                left: 50%;
+                transform: translateX(-50%);
+                font-size: 10px;
+                color: rgba(255,255,255,0.8);
+                white-space: nowrap;
             }
             
             .success-message {
@@ -390,66 +433,130 @@ def enhanced_mobile_qr_scanner():
                 top: 50%;
                 left: 50%;
                 transform: translate(-50%, -50%);
-                background: rgba(0,255,65,0.9);
+                background: linear-gradient(135deg, #00ff41, #00cc33);
                 color: white;
                 padding: 20px 30px;
                 border-radius: 15px;
                 font-size: 18px;
                 font-weight: bold;
-                z-index: 200;
+                z-index: 300;
                 display: none;
-                animation: success-popup 0.5s ease;
+                animation: success-popup 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+                box-shadow: 0 10px 30px rgba(0,255,65,0.3);
             }
             
             @keyframes success-popup {
-                0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
-                100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+                0% { 
+                    transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); 
+                    opacity: 0; 
+                }
+                100% { 
+                    transform: translate(-50%, -50%) scale(1) rotate(0deg); 
+                    opacity: 1; 
+                }
             }
             
             .error-message {
                 position: absolute;
-                bottom: 100px;
+                bottom: 120px;
                 left: 50%;
                 transform: translateX(-50%);
-                background: rgba(255,0,0,0.9);
+                background: rgba(244,67,54,0.95);
                 color: white;
                 padding: 15px 25px;
                 border-radius: 15px;
-                font-size: 16px;
-                z-index: 200;
+                font-size: 14px;
+                z-index: 300;
                 display: none;
                 max-width: 90%;
                 text-align: center;
+                backdrop-filter: blur(10px);
+            }
+            
+            .camera-status {
+                position: absolute;
+                top: 70px;
+                right: 15px;
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 6px 12px;
+                border-radius: 10px;
+                font-size: 12px;
+                z-index: 100;
+            }
+            
+            /* Responsive adjustments */
+            @media (max-width: 480px) {
+                .controls-panel {
+                    padding: 15px;
+                    gap: 15px;
+                }
+                
+                .control-btn {
+                    width: 55px;
+                    height: 55px;
+                    font-size: 18px;
+                }
+                
+                .instructions {
+                    font-size: 12px;
+                    padding: 10px 16px;
+                }
+            }
+            
+            @media (max-height: 600px) {
+                .controls-panel {
+                    padding: 12px;
+                }
+                
+                .control-btn {
+                    width: 50px;
+                    height: 50px;
+                    font-size: 16px;
+                }
             }
         </style>
     </head>
     <body>
         <div class="scanner-container">
-            <video id="video-preview" playsinline></video>
-            
-            <div class="scanner-overlay">
-                <div class="scanner-frame">
-                    <div class="scanner-corners corner-tl"></div>
-                    <div class="scanner-corners corner-tr"></div>
-                    <div class="scanner-corners corner-bl"></div>
-                    <div class="scanner-corners corner-br"></div>
+            <div class="video-container">
+                <video id="video-preview" playsinline muted></video>
+                
+                <div class="scanner-overlay">
+                    <div class="scanner-frame"></div>
+                </div>
+                
+                <div class="instructions">
+                    <div><strong>📱 Point camera at QR code</strong></div>
+                    <div>Keep code within green frame</div>
+                </div>
+                
+                <div class="zoom-display" id="zoom-display">
+                    🔍 1.0x
+                </div>
+                
+                <div class="camera-status" id="camera-status">
+                    📹 Rear Camera
                 </div>
             </div>
             
-            <div class="instructions">
-                <div><strong>📱 Point camera at QR code</strong></div>
-                <div>Keep QR code within the green frame</div>
-            </div>
-            
-            <div class="zoom-display" id="zoom-display">
-                🔍 1.0x
-            </div>
-            
-            <div class="controls">
-                <div class="control-btn" id="zoom-out" title="Zoom Out">➖</div>
-                <div class="control-btn" id="zoom-in" title="Zoom In">➕</div>
-                <div class="control-btn" id="flash-toggle" title="Toggle Flash">🔦</div>
-                <div class="control-btn" id="switch-camera" title="Switch Camera">🔄</div>
+            <div class="controls-panel">
+                <div class="control-btn" id="zoom-out" title="Zoom Out">
+                    ➖
+                    <div class="btn-label">Zoom Out</div>
+                </div>
+                <div class="control-btn" id="zoom-in" title="Zoom In">
+                    ➕
+                    <div class="btn-label">Zoom In</div>
+                </div>
+                <div class="control-btn" id="flash-toggle" title="Toggle Flash">
+                    🔦
+                    <div class="btn-label">Flash</div>
+                </div>
+                <div class="control-btn" id="switch-camera" title="Switch Camera">
+                    🔄
+                    <div class="btn-label">Switch</div>
+                </div>
             </div>
             
             <div class="success-message" id="success-message">
@@ -457,7 +564,7 @@ def enhanced_mobile_qr_scanner():
             </div>
             
             <div class="error-message" id="error-message">
-                ❌ QR code not recognized
+                ❌ Camera access failed
             </div>
         </div>
 
@@ -468,198 +575,310 @@ def enhanced_mobile_qr_scanner():
             let currentCamera = 'environment'; // 'user' for front camera
             let qrScanner = null;
             let videoElement = document.getElementById('video-preview');
+            let isScanning = true;
             
-            // Initialize camera
+            // Debounce function for button presses
+            function debounce(func, wait) {
+                let timeout;
+                return function executedFunction(...args) {
+                    const later = () => {
+                        clearTimeout(timeout);
+                        func(...args);
+                    };
+                    clearTimeout(timeout);
+                    timeout = setTimeout(later, wait);
+                };
+            }
+            
+            // Initialize camera with better error handling
             async function initCamera() {
                 try {
+                    // Stop existing stream
                     if (currentStream) {
-                        currentStream.getTracks().forEach(track => track.stop());
+                        currentStream.getTracks().forEach(track => {
+                            track.stop();
+                        });
                     }
                     
+                    // Request camera with specific constraints
                     const constraints = {
                         video: {
                             facingMode: currentCamera,
-                            width: { ideal: 1920, max: 1920 },
-                            height: { ideal: 1080, max: 1080 },
-                            frameRate: { ideal: 30 }
+                            width: { ideal: 1920, min: 640 },
+                            height: { ideal: 1080, min: 480 },
+                            frameRate: { ideal: 30, min: 15 }
                         }
                     };
                     
+                    console.log('Requesting camera access...');
                     currentStream = await navigator.mediaDevices.getUserMedia(constraints);
                     videoElement.srcObject = currentStream;
                     
+                    // Wait for video to be ready
+                    await new Promise((resolve) => {
+                        videoElement.onloadedmetadata = resolve;
+                    });
+                    
                     // Initialize QR scanner
                     if (qrScanner) {
-                        qrScanner.destroy();
+                        await qrScanner.destroy();
                     }
                     
                     qrScanner = new QrScanner(
                         videoElement,
-                        result => handleQRResult(result.data),
+                        result => {
+                            if (isScanning) {
+                                handleQRResult(result.data);
+                            }
+                        },
                         {
                             returnDetailedScanResult: true,
                             highlightScanRegion: false,
                             highlightCodeOutline: false,
-                            maxScansPerSecond: 10
+                            maxScansPerSecond: 5,
+                            preferredCamera: currentCamera
                         }
                     );
                     
                     await qrScanner.start();
+                    console.log('QR Scanner started successfully');
                     
-                    // Get camera capabilities for zoom
-                    const track = currentStream.getVideoTracks()[0];
-                    const capabilities = track.getCapabilities();
+                    // Update camera status
+                    updateCameraStatus();
                     
-                    if (capabilities.zoom) {
-                        console.log('Zoom supported:', capabilities.zoom);
-                    }
+                    // Clear any error messages
+                    document.getElementById('error-message').style.display = 'none';
                     
                 } catch (error) {
                     console.error('Camera initialization failed:', error);
-                    document.getElementById('error-message').innerHTML = 
-                        '❌ Camera access denied or not available';
-                    document.getElementById('error-message').style.display = 'block';
-                    setTimeout(() => {
-                        document.getElementById('error-message').style.display = 'none';
-                    }, 3000);
+                    showError(`Camera error: ${error.message || 'Access denied'}`);
                 }
             }
             
-            // Handle QR code detection
+            // Handle QR code detection with better feedback
             function handleQRResult(data) {
                 console.log('QR Code detected:', data);
                 
-                // Show success message
-                document.getElementById('success-message').style.display = 'block';
-                setTimeout(() => {
-                    document.getElementById('success-message').style.display = 'none';
-                }, 2000);
+                // Temporarily stop scanning to prevent duplicates
+                isScanning = false;
                 
-                // Send result to Streamlit
-                window.parent.postMessage({
-                    type: 'qr-result',
-                    data: data
-                }, '*');
+                // Show success message with vibration
+                document.getElementById('success-message').style.display = 'block';
                 
                 // Vibrate if supported
-                if (navigator.vibrate) {
+                if (typeof navigator !== 'undefined' && navigator.vibrate) {
                     navigator.vibrate([100, 50, 100]);
                 }
+                
+                // Send result to Streamlit
+                try {
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({
+                            type: 'qr-result',
+                            data: data.trim()
+                        }, '*');
+                    }
+                } catch (e) {
+                    console.error('Failed to send message to parent:', e);
+                }
+                
+                // Hide success message and resume scanning
+                setTimeout(() => {
+                    document.getElementById('success-message').style.display = 'none';
+                    isScanning = true;
+                }, 2000);
             }
             
-            // Zoom controls
+            // Show error message
+            function showError(message) {
+                const errorEl = document.getElementById('error-message');
+                errorEl.textContent = message;
+                errorEl.style.display = 'block';
+                setTimeout(() => {
+                    errorEl.style.display = 'none';
+                }, 5000);
+            }
+            
+            // Update camera status display
+            function updateCameraStatus() {
+                const statusEl = document.getElementById('camera-status');
+                statusEl.textContent = currentCamera === 'environment' ? '📹 Rear Camera' : '📹 Front Camera';
+            }
+            
+            // Zoom controls with constraints
             function applyZoom() {
                 const track = currentStream?.getVideoTracks()[0];
                 if (track) {
                     try {
-                        track.applyConstraints({
-                            advanced: [{ zoom: currentZoom }]
-                        });
+                        const capabilities = track.getCapabilities();
+                        if (capabilities.zoom) {
+                            track.applyConstraints({
+                                advanced: [{ zoom: currentZoom }]
+                            });
+                        } else {
+                            // Fallback: use CSS transform
+                            videoElement.style.transform = `scale(${currentZoom})`;
+                        }
                     } catch (e) {
-                        // Fallback: use CSS transform
+                        // Always fallback to CSS transform
                         videoElement.style.transform = `scale(${currentZoom})`;
                     }
                 }
                 document.getElementById('zoom-display').textContent = `🔍 ${currentZoom.toFixed(1)}x`;
             }
             
-            // Event listeners
-            document.getElementById('zoom-in').addEventListener('click', () => {
-                currentZoom = Math.min(4.0, currentZoom + 0.5);
+            // Debounced zoom functions
+            const debouncedZoomIn = debounce(() => {
+                currentZoom = Math.min(4.0, currentZoom + 0.3);
                 applyZoom();
-            });
+            }, 100);
             
-            document.getElementById('zoom-out').addEventListener('click', () => {
-                currentZoom = Math.max(0.5, currentZoom - 0.5);
+            const debouncedZoomOut = debounce(() => {
+                currentZoom = Math.max(0.5, currentZoom - 0.3);
                 applyZoom();
-            });
+            }, 100);
             
-            document.getElementById('flash-toggle').addEventListener('click', async () => {
+            // Flash toggle with visual feedback
+            async function toggleFlash() {
                 const track = currentStream?.getVideoTracks()[0];
+                const flashBtn = document.getElementById('flash-toggle');
+                
                 if (track) {
                     try {
-                        flashEnabled = !flashEnabled;
-                        await track.applyConstraints({
-                            advanced: [{ torch: flashEnabled }]
-                        });
-                        document.getElementById('flash-toggle').style.background = 
-                            flashEnabled ? 'rgba(255,255,0,0.5)' : 'rgba(0,0,0,0.7)';
+                        const capabilities = track.getCapabilities();
+                        if (capabilities.torch) {
+                            flashEnabled = !flashEnabled;
+                            await track.applyConstraints({
+                                advanced: [{ torch: flashEnabled }]
+                            });
+                            
+                            // Update button appearance
+                            if (flashEnabled) {
+                                flashBtn.classList.add('active');
+                            } else {
+                                flashBtn.classList.remove('active');
+                            }
+                        } else {
+                            showError('Flash not supported on this device');
+                        }
                     } catch (e) {
-                        console.log('Flash not supported');
+                        console.error('Flash toggle failed:', e);
+                        showError('Flash control failed');
+                    }
+                }
+            }
+            
+            // Camera switch with proper cleanup
+            async function switchCamera() {
+                const switchBtn = document.getElementById('switch-camera');
+                switchBtn.style.transform = 'rotate(180deg)';
+                
+                currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+                await initCamera();
+                
+                setTimeout(() => {
+                    switchBtn.style.transform = 'rotate(0deg)';
+                }, 300);
+            }
+            
+            // Event listeners with proper touch handling
+            document.getElementById('zoom-in').addEventListener('click', debouncedZoomIn);
+            document.getElementById('zoom-out').addEventListener('click', debouncedZoomOut);
+            document.getElementById('flash-toggle').addEventListener('click', toggleFlash);
+            document.getElementById('switch-camera').addEventListener('click', switchCamera);
+            
+            // Enhanced touch feedback
+            document.querySelectorAll('.control-btn').forEach(btn => {
+                btn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    btn.style.transform = 'scale(0.9)';
+                }, { passive: false });
+                
+                btn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    btn.style.transform = 'scale(1)';
+                }, { passive: false });
+                
+                // Prevent context menu on long press
+                btn.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                });
+            });
+            
+            // Handle page visibility changes
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    if (qrScanner) {
+                        qrScanner.stop();
+                    }
+                } else {
+                    if (qrScanner) {
+                        qrScanner.start();
                     }
                 }
             });
             
-            document.getElementById('switch-camera').addEventListener('click', () => {
-                currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+            // Handle orientation changes
+            window.addEventListener('orientationchange', () => {
+                setTimeout(() => {
+                    if (qrScanner) {
+                        qrScanner.stop();
+                        qrScanner.start();
+                    }
+                }, 500);
+            });
+            
+            // Initialize camera when page loads
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('DOM loaded, initializing camera...');
                 initCamera();
             });
             
-            // Handle touch events for mobile
-            document.addEventListener('touchstart', function(e) {
-                if (e.target.classList.contains('control-btn')) {
-                    e.target.style.transform = 'scale(0.95)';
-                }
-            });
-            
-            document.addEventListener('touchend', function(e) {
-                if (e.target.classList.contains('control-btn')) {
-                    e.target.style.transform = 'scale(1)';
-                }
-            });
-            
-            // Initialize on load
-            window.addEventListener('load', initCamera);
-            
-            // Handle page visibility
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    if (qrScanner) qrScanner.stop();
-                } else {
-                    if (qrScanner) qrScanner.start();
-                }
-            });
+            // Fallback initialization
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initCamera);
+            } else {
+                initCamera();
+            }
         </script>
     </body>
     </html>
     """
     
     # Display the custom scanner
-    scanned_result = components.html(html_code, height=600, scrolling=False)
+    components.html(html_code, height=700, scrolling=False)
     
-    # Handle the result
-    if 'qr_result' not in st.session_state:
-        st.session_state.qr_result = None
-    
-    # JavaScript communication handler
+    # JavaScript communication handler for receiving QR results
     st.markdown("""
     <script>
     window.addEventListener('message', function(event) {
-        if (event.data.type === 'qr-result') {
-            // Store result in session state via a hidden form submission
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.style.display = 'none';
-            
-            const input = document.createElement('input');
-            input.name = 'qr_data';
-            input.value = event.data.data;
-            form.appendChild(input);
-            
-            document.body.appendChild(form);
-            
-            // Trigger Streamlit rerun with the data
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: event.data.data
-            }, '*');
+        if (event.data && event.data.type === 'qr-result') {
+            console.log('Received QR result:', event.data.data);
+            // Store the result for Streamlit to pick up
+            window.qrResult = event.data.data;
         }
     });
     </script>
     """, unsafe_allow_html=True)
     
-    return scanned_result
-
+    # Alternative: Use session state to handle QR results
+    if 'qr_scan_result' not in st.session_state:
+        st.session_state.qr_scan_result = None
+    
+    # Manual input as backup
+    st.markdown("---")
+    st.subheader("Manual QR Input (Backup)")
+    manual_qr = st.text_input("If scanning doesn't work, enter QR code manually:", key="backup_qr_input")
+    
+    if manual_qr:
+        st.session_state.qr_scan_result = manual_qr.strip()
+    
+    if st.session_state.qr_scan_result:
+        result = st.session_state.qr_scan_result
+        st.session_state.qr_scan_result = None  # Clear after use
+        return result
+    
+    return None
 # Alternative simpler version using HTML5 camera API
 def simple_mobile_qr_scanner():
     """Simplified mobile QR scanner with better camera control"""
