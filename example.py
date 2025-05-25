@@ -13,6 +13,8 @@ from streamlit_qrcode_scanner import qrcode_scanner
 import numpy as np
 import cv2
 
+import streamlit.components.v1 as components
+
 # Configuration
 SCRIPT_DIR = Path(__file__).parent
 DATA_FILE = SCRIPT_DIR / "nav_data.json"
@@ -231,345 +233,561 @@ def handle_node_linking():
         st.success(f"Link created from {source} ({source_paths[path_key]['label']}) to {target}")
         st.rerun()
 
-# Enhanced QR Scanner with mobile-friendly features
-def enhanced_qr_scanner():
-    st.subheader("📱 QR Scanner")
+def enhanced_mobile_qr_scanner():
+    """Custom mobile-optimized QR scanner with full camera control"""
     
-    # Add custom CSS for mobile optimization
-    st.markdown("""
-    <style>
-    .qr-scanner-container {
-        width: 100%;
-        max-width: 100vw;
-        height: 70vh;
-        position: relative;
-        border-radius: 15px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-    }
+    st.subheader("📱 Enhanced Mobile QR Scanner")
     
-    .scanner-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 10;
-        pointer-events: none;
-    }
-    
-    .scanner-frame {
-        position: absolute;
-        top: 15%;
-        left: 10%;
-        right: 10%;
-        bottom: 15%;
-        border: 3px solid #00ff00;
-        border-radius: 20px;
-        box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);
-        animation: scanner-pulse 2s infinite;
-    }
-    
-    @keyframes scanner-pulse {
-        0% { border-color: #00ff00; }
-        50% { border-color: #00aa00; }
-        100% { border-color: #00ff00; }
-    }
-    
-    .scanner-corners {
-        position: absolute;
-        width: 50px;
-        height: 50px;
-        border: 4px solid #00ff00;
-    }
-    
-    .corner-tl { top: -2px; left: -2px; border-right: none; border-bottom: none; }
-    .corner-tr { top: -2px; right: -2px; border-left: none; border-bottom: none; }
-    .corner-bl { bottom: -2px; left: -2px; border-right: none; border-top: none; }
-    .corner-br { bottom: -2px; right: -2px; border-left: none; border-top: none; }
-    
-    .zoom-controls {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 20;
-        display: flex;
-        gap: 10px;
-        background: rgba(0,0,0,0.7);
-        padding: 10px;
-        border-radius: 25px;
-    }
-    
-    .zoom-btn {
-        background: rgba(255,255,255,0.2);
-        border: 2px solid white;
-        color: white;
-        width: 50px;
-        height: 50px;
-        border-radius: 50%;
-        font-size: 20px;
-        cursor: pointer;
-        transition: all 0.3s;
-    }
-    
-    .zoom-btn:hover {
-        background: rgba(255,255,255,0.4);
-    }
-    
-    .scanner-instructions {
-        position: absolute;
-        top: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        color: white;
-        text-align: center;
-        background: rgba(0,0,0,0.7);
-        padding: 10px 20px;
-        border-radius: 20px;
-        z-index: 20;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Initialize zoom level in session state
-    if 'zoom_level' not in st.session_state:
-        st.session_state.zoom_level = 1.0
-    
-    # Zoom controls
-    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
-    
-    with col1:
-        if st.button("🔍➖", help="Zoom Out"):
-            st.session_state.zoom_level = max(0.5, st.session_state.zoom_level - 0.2)
-            st.rerun()
-    
-    with col2:
-        if st.button("🔍➕", help="Zoom In"):
-            st.session_state.zoom_level = min(3.0, st.session_state.zoom_level + 0.2)
-            st.rerun()
-    
-    with col3:
-        if st.button("🎯", help="Reset Zoom"):
-            st.session_state.zoom_level = 1.0
-            st.rerun()
-    
-    with col4:
-        if st.button("🔦", help="Toggle Flash"):
-            st.info("Flash toggle requested")
-    
-    with col5:
-        st.write(f"Zoom: {st.session_state.zoom_level:.1f}x")
-    
-    # Display current zoom level
-    st.info(f"📱 Camera Zoom: {st.session_state.zoom_level:.1f}x | Point camera at QR code within the green frame")
-    
-    # Enhanced QR scanner with larger box and mobile optimization
-    qr_code = qrcode_scanner(
-        key='enhanced_qrcode_scanner',
-        # Significantly larger box size for mobile
-        box_size=min(st.session_state.get('window_width', 800), 600),
-        # Enhanced scanner parameters
-        fps_limit=30,
-        torch=False,  # Flash control
-        # Custom styling for mobile
-        style={
-            'width': '100%',
-            'height': '70vh',
-            'border-radius': '15px',
-            'border': '3px solid #4CAF50',
-            'box-shadow': '0 4px 20px rgba(0,0,0,0.3)'
-        }
-    )
-    
-    # Add scanning overlay effect
-    st.markdown("""
-    <div class="scanner-overlay">
-        <div class="scanner-frame">
-            <div class="scanner-corners corner-tl"></div>
-            <div class="scanner-corners corner-tr"></div>
-            <div class="scanner-corners corner-bl"></div>
-            <div class="scanner-corners corner-br"></div>
+    # Custom HTML with full camera control
+    html_code = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/qr-scanner/1.4.2/qr-scanner.umd.min.js"></script>
+        <style>
+            body {
+                margin: 0;
+                padding: 10px;
+                background: #000;
+                font-family: Arial, sans-serif;
+                overflow-x: hidden;
+            }
+            
+            .scanner-container {
+                position: relative;
+                width: 100vw;
+                height: 80vh;
+                max-width: 100%;
+                margin: 0 auto;
+                border-radius: 20px;
+                overflow: hidden;
+                box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+            }
+            
+            #video-preview {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+                transform-origin: center;
+                transition: transform 0.3s ease;
+            }
+            
+            .scanner-overlay {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.4);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                pointer-events: none;
+            }
+            
+            .scanner-frame {
+                width: 70vw;
+                height: 70vw;
+                max-width: 300px;
+                max-height: 300px;
+                border: 4px solid #00ff41;
+                border-radius: 20px;
+                position: relative;
+                animation: scanner-pulse 2s infinite;
+                box-shadow: 
+                    0 0 0 4px rgba(0,255,65,0.2),
+                    0 0 20px rgba(0,255,65,0.3);
+            }
+            
+            @keyframes scanner-pulse {
+                0%, 100% { 
+                    border-color: #00ff41; 
+                    box-shadow: 0 0 0 4px rgba(0,255,65,0.2), 0 0 20px rgba(0,255,65,0.3);
+                }
+                50% { 
+                    border-color: #00cc33; 
+                    box-shadow: 0 0 0 8px rgba(0,255,65,0.4), 0 0 30px rgba(0,255,65,0.5);
+                }
+            }
+            
+            .scanner-corners {
+                position: absolute;
+                width: 30px;
+                height: 30px;
+                border: 6px solid #00ff41;
+                border-radius: 4px;
+            }
+            
+            .corner-tl { top: -15px; left: -15px; border-right: none; border-bottom: none; }
+            .corner-tr { top: -15px; right: -15px; border-left: none; border-bottom: none; }
+            .corner-bl { bottom: -15px; left: -15px; border-right: none; border-top: none; }
+            .corner-br { bottom: -15px; right: -15px; border-left: none; border-top: none; }
+            
+            .controls {
+                position: absolute;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                display: flex;
+                gap: 15px;
+                z-index: 100;
+            }
+            
+            .control-btn {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                border: 3px solid white;
+                background: rgba(0,0,0,0.7);
+                color: white;
+                font-size: 18px;
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
+                user-select: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+            
+            .control-btn:hover, .control-btn:active {
+                background: rgba(0,255,65,0.3);
+                border-color: #00ff41;
+                transform: scale(1.1);
+            }
+            
+            .instructions {
+                position: absolute;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 25px;
+                text-align: center;
+                font-size: 14px;
+                z-index: 100;
+                max-width: 90%;
+            }
+            
+            .zoom-display {
+                position: absolute;
+                top: 50%;
+                right: 20px;
+                transform: translateY(-50%);
+                background: rgba(0,0,0,0.8);
+                color: white;
+                padding: 10px 15px;
+                border-radius: 15px;
+                font-size: 16px;
+                z-index: 100;
+            }
+            
+            .success-message {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: rgba(0,255,65,0.9);
+                color: white;
+                padding: 20px 30px;
+                border-radius: 15px;
+                font-size: 18px;
+                font-weight: bold;
+                z-index: 200;
+                display: none;
+                animation: success-popup 0.5s ease;
+            }
+            
+            @keyframes success-popup {
+                0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+                100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            }
+            
+            .error-message {
+                position: absolute;
+                bottom: 100px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255,0,0,0.9);
+                color: white;
+                padding: 15px 25px;
+                border-radius: 15px;
+                font-size: 16px;
+                z-index: 200;
+                display: none;
+                max-width: 90%;
+                text-align: center;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="scanner-container">
+            <video id="video-preview" playsinline></video>
+            
+            <div class="scanner-overlay">
+                <div class="scanner-frame">
+                    <div class="scanner-corners corner-tl"></div>
+                    <div class="scanner-corners corner-tr"></div>
+                    <div class="scanner-corners corner-bl"></div>
+                    <div class="scanner-corners corner-br"></div>
+                </div>
+            </div>
+            
+            <div class="instructions">
+                <div><strong>📱 Point camera at QR code</strong></div>
+                <div>Keep QR code within the green frame</div>
+            </div>
+            
+            <div class="zoom-display" id="zoom-display">
+                🔍 1.0x
+            </div>
+            
+            <div class="controls">
+                <div class="control-btn" id="zoom-out" title="Zoom Out">➖</div>
+                <div class="control-btn" id="zoom-in" title="Zoom In">➕</div>
+                <div class="control-btn" id="flash-toggle" title="Toggle Flash">🔦</div>
+                <div class="control-btn" id="switch-camera" title="Switch Camera">🔄</div>
+            </div>
+            
+            <div class="success-message" id="success-message">
+                ✅ QR Code Detected!
+            </div>
+            
+            <div class="error-message" id="error-message">
+                ❌ QR code not recognized
+            </div>
         </div>
-        <div class="scanner-instructions">
-            <div>📱 Hold phone steady</div>
-            <div>🎯 Align QR code in green frame</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if qr_code:
-        node_name = qr_code
-        if node_name in st.session_state.nav_data['nodes']:
-            st.session_state.selected_node = node_name
-            st.success(f"✅ Scanned Node: {node_name}")
-            st.balloons()  # Celebration effect
-            return node_name
-        else:
-            st.error("❌ Scanned QR code not found in database.")
-            st.info("💡 Make sure you're scanning a valid campus navigation QR code")
-    
-    return None
 
-# Alternative mobile-optimized QR scanner function
-def mobile_qr_scanner():
-    """Mobile-optimized QR scanner with full-screen experience"""
-    st.subheader("📱 Mobile QR Scanner")
+        <script>
+            let currentStream = null;
+            let currentZoom = 1.0;
+            let flashEnabled = false;
+            let currentCamera = 'environment'; // 'user' for front camera
+            let qrScanner = null;
+            let videoElement = document.getElementById('video-preview');
+            
+            // Initialize camera
+            async function initCamera() {
+                try {
+                    if (currentStream) {
+                        currentStream.getTracks().forEach(track => track.stop());
+                    }
+                    
+                    const constraints = {
+                        video: {
+                            facingMode: currentCamera,
+                            width: { ideal: 1920, max: 1920 },
+                            height: { ideal: 1080, max: 1080 },
+                            frameRate: { ideal: 30 }
+                        }
+                    };
+                    
+                    currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+                    videoElement.srcObject = currentStream;
+                    
+                    // Initialize QR scanner
+                    if (qrScanner) {
+                        qrScanner.destroy();
+                    }
+                    
+                    qrScanner = new QrScanner(
+                        videoElement,
+                        result => handleQRResult(result.data),
+                        {
+                            returnDetailedScanResult: true,
+                            highlightScanRegion: false,
+                            highlightCodeOutline: false,
+                            maxScansPerSecond: 10
+                        }
+                    );
+                    
+                    await qrScanner.start();
+                    
+                    // Get camera capabilities for zoom
+                    const track = currentStream.getVideoTracks()[0];
+                    const capabilities = track.getCapabilities();
+                    
+                    if (capabilities.zoom) {
+                        console.log('Zoom supported:', capabilities.zoom);
+                    }
+                    
+                } catch (error) {
+                    console.error('Camera initialization failed:', error);
+                    document.getElementById('error-message').innerHTML = 
+                        '❌ Camera access denied or not available';
+                    document.getElementById('error-message').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('error-message').style.display = 'none';
+                    }, 3000);
+                }
+            }
+            
+            // Handle QR code detection
+            function handleQRResult(data) {
+                console.log('QR Code detected:', data);
+                
+                // Show success message
+                document.getElementById('success-message').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('success-message').style.display = 'none';
+                }, 2000);
+                
+                // Send result to Streamlit
+                window.parent.postMessage({
+                    type: 'qr-result',
+                    data: data
+                }, '*');
+                
+                // Vibrate if supported
+                if (navigator.vibrate) {
+                    navigator.vibrate([100, 50, 100]);
+                }
+            }
+            
+            // Zoom controls
+            function applyZoom() {
+                const track = currentStream?.getVideoTracks()[0];
+                if (track) {
+                    try {
+                        track.applyConstraints({
+                            advanced: [{ zoom: currentZoom }]
+                        });
+                    } catch (e) {
+                        // Fallback: use CSS transform
+                        videoElement.style.transform = `scale(${currentZoom})`;
+                    }
+                }
+                document.getElementById('zoom-display').textContent = `🔍 ${currentZoom.toFixed(1)}x`;
+            }
+            
+            // Event listeners
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                currentZoom = Math.min(4.0, currentZoom + 0.5);
+                applyZoom();
+            });
+            
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                currentZoom = Math.max(0.5, currentZoom - 0.5);
+                applyZoom();
+            });
+            
+            document.getElementById('flash-toggle').addEventListener('click', async () => {
+                const track = currentStream?.getVideoTracks()[0];
+                if (track) {
+                    try {
+                        flashEnabled = !flashEnabled;
+                        await track.applyConstraints({
+                            advanced: [{ torch: flashEnabled }]
+                        });
+                        document.getElementById('flash-toggle').style.background = 
+                            flashEnabled ? 'rgba(255,255,0,0.5)' : 'rgba(0,0,0,0.7)';
+                    } catch (e) {
+                        console.log('Flash not supported');
+                    }
+                }
+            });
+            
+            document.getElementById('switch-camera').addEventListener('click', () => {
+                currentCamera = currentCamera === 'environment' ? 'user' : 'environment';
+                initCamera();
+            });
+            
+            // Handle touch events for mobile
+            document.addEventListener('touchstart', function(e) {
+                if (e.target.classList.contains('control-btn')) {
+                    e.target.style.transform = 'scale(0.95)';
+                }
+            });
+            
+            document.addEventListener('touchend', function(e) {
+                if (e.target.classList.contains('control-btn')) {
+                    e.target.style.transform = 'scale(1)';
+                }
+            });
+            
+            // Initialize on load
+            window.addEventListener('load', initCamera);
+            
+            // Handle page visibility
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    if (qrScanner) qrScanner.stop();
+                } else {
+                    if (qrScanner) qrScanner.start();
+                }
+            });
+        </script>
+    </body>
+    </html>
+    """
     
-    # Add JavaScript for mobile optimization
+    # Display the custom scanner
+    scanned_result = components.html(html_code, height=600, scrolling=False)
+    
+    # Handle the result
+    if 'qr_result' not in st.session_state:
+        st.session_state.qr_result = None
+    
+    # JavaScript communication handler
     st.markdown("""
     <script>
-    // Mobile optimization script
-    function optimizeForMobile() {
-        // Get screen dimensions
-        const screenWidth = window.screen.width;
-        const screenHeight = window.screen.height;
-        
-        // Set scanner size based on screen
-        const scannerSize = Math.min(screenWidth * 0.9, screenHeight * 0.6);
-        
-        // Store in session for Python access
-        window.parent.postMessage({
-            type: 'screenInfo',
-            width: screenWidth,
-            height: screenHeight,
-            scannerSize: scannerSize
-        }, '*');
-    }
-    
-    // Call on load
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', optimizeForMobile);
-    } else {
-        optimizeForMobile();
-    }
+    window.addEventListener('message', function(event) {
+        if (event.data.type === 'qr-result') {
+            // Store result in session state via a hidden form submission
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.style.display = 'none';
+            
+            const input = document.createElement('input');
+            input.name = 'qr_data';
+            input.value = event.data.data;
+            form.appendChild(input);
+            
+            document.body.appendChild(form);
+            
+            // Trigger Streamlit rerun with the data
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: event.data.data
+            }, '*');
+        }
+    });
     </script>
     """, unsafe_allow_html=True)
     
-    # Mobile-specific controls
-    st.markdown("### 📱 Camera Controls")
+    return scanned_result
+
+# Alternative simpler version using HTML5 camera API
+def simple_mobile_qr_scanner():
+    """Simplified mobile QR scanner with better camera control"""
     
-    # Create responsive layout
-    control_cols = st.columns([2, 2, 2, 2])
-    
-    with control_cols[0]:
-        zoom_out = st.button("🔍➖ Zoom Out", use_container_width=True)
-    with control_cols[1]:
-        zoom_in = st.button("🔍➕ Zoom In", use_container_width=True)
-    with control_cols[2]:
-        reset_zoom = st.button("🎯 Reset", use_container_width=True)
-    with control_cols[3]:
-        toggle_flash = st.button("🔦 Flash", use_container_width=True)
-    
-    # Handle zoom controls
-    if zoom_out:
-        st.session_state.zoom_level = max(0.5, st.session_state.get('zoom_level', 1.0) - 0.25)
-    if zoom_in:
-        st.session_state.zoom_level = min(4.0, st.session_state.get('zoom_level', 1.0) + 0.25)
-    if reset_zoom:
-        st.session_state.zoom_level = 1.0
-    
-    # Display zoom level
-    zoom_level = st.session_state.get('zoom_level', 1.0)
-    st.info(f"🔍 Current Zoom: {zoom_level:.1f}x")
-    
-    # Enhanced scanner with mobile-first approach
-    scanner_container = st.container()
-    
-    with scanner_container:
-        # Use larger box size for mobile
-        mobile_box_size = 800  # Increased from default
-        
-        qr_code = qrcode_scanner(
-            key='mobile_qr_scanner',
-            box_size=mobile_box_size,
-            fps_limit=24,  # Optimized for mobile
-            torch=st.session_state.get('flash_enabled', False)
-        )
-        
-        # Add mobile-friendly instructions
-        st.markdown("""
-        <div style="
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 15px;
-            border-radius: 10px;
-            color: white;
-            text-align: center;
-            margin: 10px 0;
-        ">
-            <h4>📱 Scanning Instructions</h4>
-            <p>• Hold your phone steady</p>
-            <p>• Point camera at QR code</p>
-            <p>• Move closer or farther to focus</p>
-            <p>• Use zoom controls if needed</p>
+    html_scanner = """
+    <div style="text-align: center; padding: 20px;">
+        <div style="position: relative; display: inline-block; border-radius: 20px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.3);">
+            <video id="qr-video" style="width: 90vw; max-width: 500px; height: 60vh; object-fit: cover;"></video>
+            
+            <!-- Scanner overlay -->
+            <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+                        background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;
+                        pointer-events: none;">
+                <div style="width: 250px; height: 250px; border: 4px solid #00ff00; 
+                           border-radius: 20px; animation: pulse 2s infinite;">
+                </div>
+            </div>
+            
+            <!-- Controls -->
+            <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+                        display: flex; gap: 15px;">
+                <button onclick="zoomIn()" style="width: 50px; height: 50px; border-radius: 50%; 
+                        background: rgba(0,0,0,0.7); color: white; border: 2px solid white; font-size: 16px;">➕</button>
+                <button onclick="zoomOut()" style="width: 50px; height: 50px; border-radius: 50%; 
+                        background: rgba(0,0,0,0.7); color: white; border: 2px solid white; font-size: 16px;">➖</button>
+                <button onclick="toggleFlash()" style="width: 50px; height: 50px; border-radius: 50%; 
+                        background: rgba(0,0,0,0.7); color: white; border: 2px solid white; font-size: 16px;">🔦</button>
+            </div>
         </div>
-        """, unsafe_allow_html=True)
+        
+        <div style="margin-top: 20px; padding: 15px; background: #f0f0f0; border-radius: 10px;">
+            <h4>📱 Scanning Instructions</h4>
+            <p>• Hold your phone steady<br>
+            • Point camera at QR code<br>
+            • Keep QR code within the green square<br>
+            • Use ➕/➖ for zoom, 🔦 for flash</p>
+        </div>
+    </div>
     
-    return qr_code
-
-# QR Scanner using streamlit_qrcode_scanner
-def qr_scanner():
-    """Enhanced QR Scanner - use this to replace the original function"""
-    return enhanced_qr_scanner()
-
-def is_mobile_device():
-    """Detect if user is on mobile device"""
-    # This would typically use user agent detection in a real app
-    # For Streamlit, we can use JavaScript or assume mobile based on screen size
-    return True  # Assume mobile for enhanced experience
-
-# Custom CSS injection function for mobile optimization
-def inject_mobile_css():
-    """Inject mobile-optimized CSS"""
-    st.markdown("""
     <style>
-    /* Mobile-first responsive design */
-    @media (max-width: 768px) {
-        .stButton > button {
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            margin: 5px 0;
-        }
-        
-        .stSelectbox > div > div {
-            font-size: 16px;
-        }
-        
-        /* Make QR scanner full width on mobile */
-        .stCamera > div {
-            width: 100% !important;
-            max-width: none !important;
-        }
-        
-        /* Enhance touch targets */
-        .stRadio > div {
-            gap: 15px;
-        }
-        
-        .stRadio > div > label {
-            padding: 10px;
-            border-radius: 8px;
-            background: rgba(0,0,0,0.05);
-        }
-    }
-    
-    /* Camera preview enhancements */
-    video {
-        border-radius: 15px !important;
-        box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
-    }
-    
-    /* Success/Error message styling */
-    .stSuccess, .stError {
-        font-size: 18px;
-        padding: 15px;
-        border-radius: 10px;
+    @keyframes pulse {
+        0%, 100% { border-color: #00ff00; opacity: 1; }
+        50% { border-color: #00aa00; opacity: 0.7; }
     }
     </style>
-    """, unsafe_allow_html=True)
-
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qr-scanner/1.4.2/qr-scanner.umd.min.js"></script>
+    <script>
+    let videoElement = document.getElementById('qr-video');
+    let currentStream = null;
+    let currentZoom = 1.0;
+    let qrScanner = null;
+    
+    async function startCamera() {
+        try {
+            currentStream = await navigator.mediaDevices.getUserMedia({
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                }
+            });
+            videoElement.srcObject = currentStream;
+            
+            qrScanner = new QrScanner(videoElement, result => {
+                console.log('QR detected:', result.data);
+                alert('QR Code: ' + result.data);
+                // You can send this to Streamlit via postMessage
+                window.parent.postMessage({qr_data: result.data}, '*');
+            });
+            
+            qrScanner.start();
+        } catch (error) {
+            console.error('Camera error:', error);
+            alert('Camera access failed: ' + error.message);
+        }
+    }
+    
+    function zoomIn() {
+        currentZoom = Math.min(3.0, currentZoom + 0.3);
+        videoElement.style.transform = `scale(${currentZoom})`;
+    }
+    
+    function zoomOut() {
+        currentZoom = Math.max(0.7, currentZoom - 0.3);
+        videoElement.style.transform = `scale(${currentZoom})`;
+    }
+    
+    function toggleFlash() {
+        const track = currentStream?.getVideoTracks()[0];
+        if (track) {
+            track.applyConstraints({
+                advanced: [{torch: !track.getSettings().torch}]
+            }).catch(e => console.log('Flash not supported'));
+        }
+    }
+    
+    // Start camera when page loads
+    startCamera();
+    </script>
+    """
+    
+    return components.html(html_scanner, height=700)
+# QR Scanner using streamlit_qrcode_scanner
+def qr_scanner():
+    """Replace your existing qr_scanner function with this"""
+    st.subheader("📱 QR Code Scanner")
+    
+    # Show a toggle for scanner type
+    scanner_type = st.radio("Scanner Type", ["Enhanced Mobile Scanner", "Simple Scanner"], horizontal=True)
+    
+    if scanner_type == "Enhanced Mobile Scanner":
+        result = enhanced_mobile_qr_scanner()
+    else:
+        result = simple_mobile_qr_scanner()
+    
+    # Handle any results
+    if result:
+        node_name = str(result).strip()
+        if node_name in st.session_state.nav_data['nodes']:
+            st.session_state.selected_node = node_name
+            st.success(f"✅ Successfully scanned: {node_name}")
+            st.balloons()
+            return node_name
+        else:
+            st.error(f"❌ QR code '{node_name}' not found in navigation database")
+    
+    return None
 
 # Navigation Display
 def display_navigation(path):
@@ -713,7 +931,6 @@ def show_interactive_graph():
 
 # Main Application
 def main():
-    inject_mobile_css()
     st.sidebar.title("Smart Campus Navigator")
     mode = st.sidebar.radio("Mode", ["User", "Admin"])
     
