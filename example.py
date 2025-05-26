@@ -753,58 +753,30 @@ def show_path_graph_with_weights(path, total_distance):
     else:
         st.warning("No path visualization available")
 
+import plotly.graph_objects as go
+import networkx as nx
+import numpy as np
+
 def show_full_graph():
     st.subheader("🗺️ Complete Campus Network")
     
-    # Zoom configuration section
-    st.sidebar.subheader("🔍 Zoom Settings")
-    col1, col2 = st.sidebar.columns(2)
+    # Set fixed zoom values
+    min_zoom = 0.3
+    max_zoom = 4.0
     
-    with col1:
-        min_zoom = st.number_input(
-            "Min Zoom", 
-            min_value=0.1, 
-            max_value=2.0, 
-            value=0.5, 
-            step=0.1,
-            help="Minimum zoom level (how far out you can zoom)"
-        )
-    
-    with col2:
-        max_zoom = st.number_input(
-            "Max Zoom", 
-            min_value=0.5, 
-            max_value=5.0, 
-            value=2.0, 
-            step=0.1,
-            help="Maximum zoom level (how far in you can zoom)"
-        )
-    
-    # Display current zoom values
-    st.sidebar.info(f"**Current Zoom Range:**\n- Min: {min_zoom}x\n- Max: {max_zoom}x")
-    
-    # Validation
-    if min_zoom >= max_zoom:
-        st.sidebar.error("⚠️ Min zoom must be less than max zoom!")
+    if not st.session_state.nav_data['nodes']:
+        st.info("No nodes available. Create some nodes first!")
         return
     
-    nodes = []
+    # Create NetworkX graph for layout calculation
+    G = nx.Graph()
+    
+    # Add nodes
     for node_name in st.session_state.nav_data['nodes']:
-        nodes.append(Node(
-            id=node_name,
-            label=node_name,
-            color="#2196F3",
-            size=20,
-            font={"size": 12, "color": "#000000"},
-            # Fixed font size and color
-            borderWidth=2,
-            borderWidthSelected=2,
-            # Prevent border change on selection
-            scaling={"min": 20, "max": 20}
-            # Lock node size
-        ))
-
-    edges = []
+        G.add_node(node_name)
+    
+    # Add edges with weights
+    edge_info = {}
     for conn, details in st.session_state.nav_data['connections'].items():
         source = details['from']
         target = details['to']
@@ -812,78 +784,169 @@ def show_full_graph():
         
         if path_key in st.session_state.nav_data['nodes'][source]:
             distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
-            # Only show weight/distance, no path label
-            edges.append(Edge(
-                source=source,
-                target=target,
-                label=f"{distance}ft",
-                color="#4CAF50",
-                width=2,
-                font={"size": 10, "color": "#333333", "strokeWidth": 0}
-            ))
-
-    # Fixed configuration for static map-like view with configurable zoom
-    config = Config(
-        width=800,
-        height=600,
-        directed=True,
-        physics=False,
-        # Disable physics for static positioning
-        hierarchical=False,
-        nodeHighlightBehavior=False,
-        # Disable node highlighting
-        link={"highlightColor": "rgba(0,0,0,0)"},
-        # Disable link highlighting
-        node={
-            "highlightStrokeColor": "rgba(0,0,0,0)",
-            # Disable node highlight
-            "labelProperty": "label",
-            "renderLabel": True
-        },
-        maxZoom=max_zoom,
-        # Configurable max zoom
-        minZoom=min_zoom,
-        # Configurable min zoom
-        initialZoom=1.0,
-        staticGraph=False,
-        # Allow panning but disable node dragging
-        staticGraphWithDragAndDrop=False,
-        # Prevent node dragging
-        panAndZoom=True,
-        # Enable pan and zoom for navigation
-        zoomScaleExtent=[min_zoom, max_zoom],
-        # Use configurable zoom range
-        d3={
-            "alphaTarget": 0,
-            "gravity": 0,
-            "linkDistance": 100,
-            "linkStrength": 0
-        }
-    )
-
-    if nodes:
-        # Apply custom CSS to ensure light background and prevent node size changes
-        st.markdown("""
-        <style>
-        .agraph-container {
-            background-color: #f8f9fa !important;
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-        }
-        /* Ensure nodes maintain fixed size during zoom */
-        .agraph-container svg g.nodes circle {
-            r: 20px !important;
-        }
-        /* Light background for better visibility */
-        .agraph-container svg {
-            background-color: #ffffff !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+            G.add_edge(source, target, weight=distance)
+            edge_info[(source, target)] = distance
+    
+    # Calculate layout
+    pos = nx.spring_layout(G, k=3, iterations=50)
+    
+    # Create edge traces
+    edge_x = []
+    edge_y = []
+    edge_info_text = []
+    
+    for edge in G.edges():
+        x0, y0 = pos[edge[0]]
+        x1, y1 = pos[edge[1]]
+        edge_x.extend([x0, x1, None])
+        edge_y.extend([y0, y1, None])
         
-        agraph(nodes=nodes, edges=edges, config=config)
-    else:
-        st.info("No nodes available. Create some nodes first!")
+        # Add distance label at midpoint
+        mid_x, mid_y = (x0 + x1) / 2, (y0 + y1) / 2
+        distance = edge_info.get(edge, edge_info.get((edge[1], edge[0]), 0))
+        edge_info_text.append((mid_x, mid_y, f"{distance}ft"))
+    
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=2, color='#4CAF50'),
+        hoverinfo='none',
+        mode='lines'
+    )
+    
+    # Create node traces
+    node_x = []
+    node_y = []
+    node_text = []
+    node_info = []
+    
+    for node in G.nodes():
+        x, y = pos[node]
+        node_x.append(x)
+        node_y.append(y)
+        node_text.append(node)
+        
+        # Create hover info
+        adjacencies = list(G.neighbors(node))
+        node_info.append(f'Node: {node}<br>Connections: {len(adjacencies)}<br>Connected to: {", ".join(adjacencies)}')
+    
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers+text',
+        hoverinfo='text',
+        text=node_text,
+        textposition="middle center",
+        hovertext=node_info,
+        marker=dict(
+            showscale=False,
+            color='#2196F3',
+            size=30,
+            line=dict(width=2, color='#1976D2')
+        )
+    )
+    
+    # Create distance label traces
+    label_traces = []
+    for mid_x, mid_y, label in edge_info_text:
+        label_trace = go.Scatter(
+            x=[mid_x], y=[mid_y],
+            mode='text',
+            text=[label],
+            textfont=dict(size=10, color='#333333'),
+            showlegend=False,
+            hoverinfo='none'
+        )
+        label_traces.append(label_trace)
+    
+    # Create figure
+    fig_data = [edge_trace, node_trace] + label_traces
+    
+    fig = go.Figure(
+        data=fig_data,
+        layout=go.Layout(
+            title=dict(
+                text="Campus Network Graph",
+                font=dict(size=20),
+                x=0.5
+            ),
+            showlegend=False,
+            hovermode='closest',
+            margin=dict(b=20, l=5, r=5, t=60),
+            annotations=[
+                dict(
+                    text="Campus Network Graph - Interactive View",
+                    showarrow=False,
+                    xref="paper", yref="paper",
+                    x=0.5, y=-0.05,
+                    xanchor='center',
+                    font=dict(size=12, color='#666666')
+                )
+            ],
+            xaxis=dict(
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False,
+                scaleanchor="y",
+                scaleratio=1
+            ),
+            yaxis=dict(
+                showgrid=False, 
+                zeroline=False, 
+                showticklabels=False
+            ),
+            plot_bgcolor='#f8f9fa',
+            paper_bgcolor='white',
+            # Configure zoom limits
+            dragmode='pan',
+            # Set zoom range
+        )
+    )
+    
+    # Update layout with zoom constraints
+    fig.update_layout(
+        xaxis=dict(
+            range=[min(node_x) - 0.5, max(node_x) + 0.5],
+            fixedrange=False
+        ),
+        yaxis=dict(
+            range=[min(node_y) - 0.5, max(node_y) + 0.5],
+            fixedrange=False
+        )
+    )
+    
+    # Configure zoom behavior
+    config = {
+        'displayModeBar': True,
+        'displaylogo': False,
+        'modeBarButtonsToRemove': ['select2d', 'lasso2d', 'autoScale2d'],
+        'scrollZoom': True,
+        'doubleClick': 'reset',
+        'toImageButtonOptions': {
+            'format': 'png',
+            'filename': 'campus_network',
+            'height': 600,
+            'width': 800,
+            'scale': 1
+        }
+    }
+    
+    # Graph controls info
+    st.info("""
+    **Graph Controls:**
+    - 🖱️ **Pan**: Click and drag to move around
+    - 🔍 **Zoom**: Scroll wheel or use toolbar buttons  
+    - 🏠 **Reset**: Double-click to reset view
+    - 📷 **Export**: Use camera icon in toolbar
+    """)
+    
+    # Display the graph
+    st.plotly_chart(fig, use_container_width=True, config=config)
+    
+    # Additional controls
+    with st.expander("📊 Graph Statistics"):
+        st.write(f"**Nodes:** {len(G.nodes())}")
+        st.write(f"**Edges:** {len(G.edges())}")
+        st.write(f"**Average Distance:** {np.mean(list(edge_info.values())):.1f}ft")
+        st.write(f"**Total Network Length:** {sum(edge_info.values()):.1f}ft")
 # QR Code Scanner Integration
 def handle_qr_scanner():
     st.subheader("📱 QR Code Scanner")
