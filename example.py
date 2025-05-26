@@ -733,7 +733,7 @@ def show_path_graph_with_weights(path, total_distance):
                     target=next_node,
                     label=f"{label}\n{distance}ft",
                     color="#2196F3",
-                    width=10
+                    width=5
                 ))
 
     config = Config(
