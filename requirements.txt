@@ -7,4 +7,7 @@ streamlit-qrcode-scanner
 numpy
 opencv-python-headless
 pydot
+plotly==5.21.0
+
+
 
