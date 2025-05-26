@@ -12,6 +12,10 @@ import time
 from streamlit_agraph import agraph, Node, Edge, Config
 from streamlit_qrcode_scanner import qrcode_scanner
 
+import plotly.graph_objects as go
+
+import numpy as np
+
 # GitHub Configuration
 GITHUB_TOKEN = st.secrets.get("GITHUB_TOKEN", "")  # Set in Streamlit secrets
 GITHUB_REPO = st.secrets.get("GITHUB_REPO", "")   # Format: "username/repository"
@@ -753,9 +757,7 @@ def show_path_graph_with_weights(path, total_distance):
     else:
         st.warning("No path visualization available")
 
-import plotly.graph_objects as go
-import networkx as nx
-import numpy as np
+
 
 def show_full_graph():
     st.subheader("🗺️ Complete Campus Network")
