@@ -3,8 +3,8 @@
     "B": {
       "path_1": {
         "label": "1B",
-        "distance": 3,
-        "instruction": "go 3 feet straight",
+        "distance": 5,
+        "instruction": "go 5 feet straight",
         "images": [],
         "landmark": ""
       }
