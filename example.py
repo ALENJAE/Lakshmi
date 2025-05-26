@@ -702,9 +702,9 @@ def show_path_graph_with_weights(path, total_distance):
     for node_name in st.session_state.nav_data['nodes']:
         if node_name in path:
             if node_name == path[0]:
-                nodes.append(Node(id=node_name, label=f"{node_name}\n🚀 START", color="#4CAF50", size=25))
+                nodes.append(Node(id=node_name, label=f"{node_name}\n(🚀START)", color="#4CAF50", size=25))
             elif node_name == path[-1]:
-                nodes.append(Node(id=node_name, label=f"{node_name}\n🏁 END", color="#F44336", size=25))
+                nodes.append(Node(id=node_name, label=f"{node_name}\n(🏁END)", color="#F44336", size=25))
             else:
                 nodes.append(Node(id=node_name, label=node_name, color="#FF9800", size=20))
         else:
