@@ -756,19 +756,54 @@ def show_path_graph_with_weights(path, total_distance):
 def show_full_graph():
     st.subheader("🗺️ Complete Campus Network")
     
+    # Zoom configuration section
+    st.sidebar.subheader("🔍 Zoom Settings")
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        min_zoom = st.number_input(
+            "Min Zoom", 
+            min_value=0.1, 
+            max_value=2.0, 
+            value=0.5, 
+            step=0.1,
+            help="Minimum zoom level (how far out you can zoom)"
+        )
+    
+    with col2:
+        max_zoom = st.number_input(
+            "Max Zoom", 
+            min_value=0.5, 
+            max_value=5.0, 
+            value=2.0, 
+            step=0.1,
+            help="Maximum zoom level (how far in you can zoom)"
+        )
+    
+    # Display current zoom values
+    st.sidebar.info(f"**Current Zoom Range:**\n- Min: {min_zoom}x\n- Max: {max_zoom}x")
+    
+    # Validation
+    if min_zoom >= max_zoom:
+        st.sidebar.error("⚠️ Min zoom must be less than max zoom!")
+        return
+    
     nodes = []
     for node_name in st.session_state.nav_data['nodes']:
         nodes.append(Node(
-            id=node_name, 
-            label=node_name, 
-            color="#2196F3", 
+            id=node_name,
+            label=node_name,
+            color="#2196F3",
             size=20,
-            font={"size": 12, "color": "#000000"},  # Fixed font size and color
+            font={"size": 12, "color": "#000000"},
+            # Fixed font size and color
             borderWidth=2,
-            borderWidthSelected=2,  # Prevent border change on selection
-            scaling={"min": 20, "max": 20}  # Lock node size
+            borderWidthSelected=2,
+            # Prevent border change on selection
+            scaling={"min": 20, "max": 20}
+            # Lock node size
         ))
-    
+
     edges = []
     for conn, details in st.session_state.nav_data['connections'].items():
         source = details['from']
@@ -779,35 +814,45 @@ def show_full_graph():
             distance = st.session_state.nav_data['nodes'][source][path_key]['distance']
             # Only show weight/distance, no path label
             edges.append(Edge(
-                source=source, 
-                target=target, 
-                label=f"{distance}ft", 
+                source=source,
+                target=target,
+                label=f"{distance}ft",
                 color="#4CAF50",
                 width=2,
                 font={"size": 10, "color": "#333333", "strokeWidth": 0}
             ))
-    
-    # Fixed configuration for static map-like view
+
+    # Fixed configuration for static map-like view with configurable zoom
     config = Config(
         width=800,
         height=600,
         directed=True,
-        physics=False,  # Disable physics for static positioning
+        physics=False,
+        # Disable physics for static positioning
         hierarchical=False,
-        nodeHighlightBehavior=False,  # Disable node highlighting
-        link={"highlightColor": "rgba(0,0,0,0)"},  # Disable link highlighting
+        nodeHighlightBehavior=False,
+        # Disable node highlighting
+        link={"highlightColor": "rgba(0,0,0,0)"},
+        # Disable link highlighting
         node={
-            "highlightStrokeColor": "rgba(0,0,0,0)",  # Disable node highlight
+            "highlightStrokeColor": "rgba(0,0,0,0)",
+            # Disable node highlight
             "labelProperty": "label",
             "renderLabel": True
         },
-        maxZoom=2.0,  # Allow some zoom for navigation
-        minZoom=0.5,  # Allow zoom out
+        maxZoom=max_zoom,
+        # Configurable max zoom
+        minZoom=min_zoom,
+        # Configurable min zoom
         initialZoom=1.0,
-        staticGraph=False,  # Allow panning but disable node dragging
-        staticGraphWithDragAndDrop=False,  # Prevent node dragging
-        panAndZoom=True,  # Enable pan and zoom for navigation
-        zoomScaleExtent=[0.5, 2.0],  # Limit zoom range
+        staticGraph=False,
+        # Allow panning but disable node dragging
+        staticGraphWithDragAndDrop=False,
+        # Prevent node dragging
+        panAndZoom=True,
+        # Enable pan and zoom for navigation
+        zoomScaleExtent=[min_zoom, max_zoom],
+        # Use configurable zoom range
         d3={
             "alphaTarget": 0,
             "gravity": 0,
@@ -815,7 +860,7 @@ def show_full_graph():
             "linkStrength": 0
         }
     )
-    
+
     if nodes:
         # Apply custom CSS to ensure light background and prevent node size changes
         st.markdown("""
@@ -825,12 +870,10 @@ def show_full_graph():
             border: 1px solid #dee2e6;
             border-radius: 8px;
         }
-        
         /* Ensure nodes maintain fixed size during zoom */
         .agraph-container svg g.nodes circle {
             r: 20px !important;
         }
-        
         /* Light background for better visibility */
         .agraph-container svg {
             background-color: #ffffff !important;
