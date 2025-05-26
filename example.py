@@ -733,14 +733,14 @@ def show_path_graph_with_weights(path, total_distance):
                     target=next_node,
                     label=f"{label}\n{distance}ft",
                     color="#2196F3",
-                    width=5
+                    width=8
                 ))
 
     config = Config(
         width=800,
         height=600,
         directed=True,
-        physics=True,
+        physics=False,
         hierarchical=False,
         nodeHighlightBehavior=True,
         highlightColor="#F0F8FF",
