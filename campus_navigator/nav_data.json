@@ -1,14 +1,4 @@
 {
-  "nodes": {
-    "B": {
-      "path_1": {
-        "label": "1B",
-        "distance": 5,
-        "instruction": "go 5 feet straight",
-        "images": [],
-        "landmark": ""
-      }
-    }
-  },
+  "nodes": {},
   "connections": {}
 }
