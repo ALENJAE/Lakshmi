@@ -8,27 +8,7 @@
         "images": [],
         "landmark": ""
       }
-    },
-    "A": {
-      "path_1": {
-        "label": "1f",
-        "distance": 5,
-        "instruction": "5 f s",
-        "images": [],
-        "landmark": ""
-      }
     }
   },
-  "connections": {
-    "B::path_1::A": {
-      "from": "B",
-      "to": "A",
-      "path_key": "path_1"
-    },
-    "A::path_1::B": {
-      "from": "A",
-      "to": "B",
-      "path_key": "path_1"
-    }
-  }
+  "connections": {}
 }
